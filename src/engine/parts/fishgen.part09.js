@@ -101,6 +101,8 @@ class BodyModel {
     /* jaw articulation: behind the mouth corner and never in front of the eye line, always ahead of the gill opening */
     this.hingeU = clamp(Math.max(this.mcU + .004, this.lm.eye), this.mcU, Math.max(this.mcU, this.h * g.head.gillStart - .006));
     if (this.law.flat) { const sp = this.L * (this.a.family === 'ray' ? clamp(g.fins.pectoral.len * .47, .58, 1.23) : .42); this.discMargin = sp * this.law.flat.marginFrac; }
+    this.disc = DISC.isDisc(this) ? DISC.plan(this) : null;   /* round 6A: the disc plan is one solid, opaque surface (discgeo.js) */
+    if (this.disc) { this.discMargin = 0; this.maxD = this.disc.Hc; }
     this._fr = {}; this._s = {};
   }
   frame(u, out) {
@@ -110,6 +112,7 @@ class BodyModel {
     out.px = a.x + (b2.x - a.x) * f; out.py = a.y + (b2.y - a.y) * f; out.tx = -Math.cos(phi); out.ty = -Math.sin(phi); out.nx = out.ty; out.ny = -out.tx; return out;
   }
   section(u, s) {
+    if (this.disc) return DISC.section(this, u, s);
     const g = this.g, b = g.body, L = this.L, d = this.bp.depth(u) * L, w = this.bp.width(u) * L;
     if (this.billStart !== null && u < .004) {
       const f = clamp((u - this.billStart) / (.004 - this.billStart), 0, 1), d0 = this.bp.depth(.004) * L, w0 = this.bp.width(.004) * L;
@@ -154,6 +157,7 @@ class BodyModel {
   }
   halfWidthAtY(s, y) { const yR = y > 0 ? s.dUp : s.dDn, yn = y > 0 ? s.nD : s.nV; const q = Math.min(1, Math.pow(Math.abs(y) / Math.max(1e-9, yR), yn)); return s.w * Math.pow(Math.max(0, 1 - q), 1 / s.n); }
   point(u, theta, out, fr, s, raw = false) {
+    if (this.disc) return DISC.point(this, u, theta, out, fr, s);
     const g = this.g, ct = Math.cos(theta), st = Math.sin(theta), n = st > 0 ? s.nD : s.nV, yR = st > 0 ? s.dUp : s.dDn;
     let ly = Math.sign(st) * Math.pow(Math.abs(st), 2 / n) * yR, lz = Math.sign(ct) * Math.pow(Math.abs(ct), 2 / s.n) * s.w;
     if (this.a.family === 'ray' || this.a.family === 'benthicShark') {
@@ -197,10 +201,11 @@ class BodyModel {
   }
 }
 function buildBodyGeometry(bm, S, R) {
+  if (bm.disc) R = Math.max(12, Math.round(R * 2.5 / 4) * 4);   /* disc ring: faces uniform in z, so the underside grooves get real vertex columns */
   const billRings = bm.billStart === null ? 0 : (S < 30 ? 5 : 12);
   const Ubase = []; for (let i = 0; i <= S + billRings; i++) { const t = Math.max(0, i - billRings) / S; Ubase.push(i < billRings ? lerp(bm.billStart, .004, (i + 1) / (billRings + 1)) : Math.max(.004, t * (.6 + .4 * t))); }
   if (!bm.lod) {      /* extra stations across every groove / the opercular trench: real depth instead of aliasing */
-    for (const e of GILL.extraStations(bm)) if (e > .006 && e < .98) Ubase.push(e);
+    for (const e of (bm.disc ? DISC.extraStations(bm) : GILL.extraStations(bm))) if (e > .006 && e < .98) Ubase.push(e);
     Ubase.sort((a, b) => a - b); for (let i = Ubase.length - 1; i > 0; i--) if (Ubase[i] - Ubase[i - 1] < 1e-5) Ubase.splice(i, 1);
   }
   const stations = Ubase.length - 1;

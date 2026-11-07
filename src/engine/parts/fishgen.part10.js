@@ -156,7 +156,7 @@ function buildEyes(bm, seg, mats) {
   for (const [side, yy, uu] of list) {
     bm.frame(uu, fr); bm.section(uu, s);
     const yn = yy > 0 ? s.nD : s.nV, yr = yy > 0 ? s.dUp : s.dDn;
-    const th = ray ? Math.acos(clamp(Math.pow(s.coreW * .8 / Math.max(1e-8, s.w), s.n / 2), 0, 1))
+    const th = bm.disc ? DISC.thetaOfZ(s, s.coreW * .8) : ray ? Math.acos(clamp(Math.pow(s.coreW * .8 / Math.max(1e-8, s.w), s.n / 2), 0, 1))
       : Math.asin(Math.sign(yy) * Math.pow(clamp(Math.abs(yy) / Math.max(1e-8, yr), 0, .9), yn / 2));
     const theta = side > 0 ? th : Math.PI - th, surface = {}, axis = new THREE.Vector3();
     bm.rawSurface(uu, theta, surface); bm.surfaceNormal(uu, theta, axis);
@@ -182,6 +182,7 @@ function buildEyes(bm, seg, mats) {
   return out;
 }
 function buildNostrils(bm, mats) {
+  if (bm.disc) return DISC.buildMarks(bm, mats, GH);
   /* round 5B: the only marks that may sit on the cheek / snout are the paired nares (every plan) and the spiracle (plans that carry one: cartilaginous / flattened — never a bony plan). Both are SOFT, low-contrast
      pits (tag 8: the skin colour darkened at most ~30 %, falling to zero at the rim — vBody.w), sized from the EYE (never from body depth), at the positions the plan puts them. No hard dark disk exists. */
   const geos = [], g = bm.g, points = {}, normal = new THREE.Vector3(), bony = bm.a.gills === 'lateral';

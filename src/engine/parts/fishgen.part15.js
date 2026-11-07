@@ -1,249 +1,180 @@
-    body.querySelector('#expShare').onclick = async () => { updateHash(); const url = location.href; try { await navigator.clipboard.writeText(url); toast('Share link copied'); } catch (e) { prompt('Copy this link', url); } };
-    body.querySelector('#expGlb').onclick = () => exportGLB(name);
-    body.querySelector('#impJson').onchange = ev => { const file = ev.target.files[0]; if (!file) return; const rd = new FileReader(); rd.onload = () => { try { const { genome, issues } = validateGenome(JSON.parse(rd.result)); genome.meta.repairs = issues.map(i => ({ rule: 'schema_validate', path: '-', from: '-', to: i })); genome.meta.edited = true; finalize(genome); syncSelects(genome); setFish(genome); toast(`Imported (${issues.length} schema fixes, ${genome.meta.repairs.length} total repairs)`); } catch (e) { toast('Import failed: ' + e.message); } }; rd.readAsText(file); };
-  },
-  debug(body) {
-    const g = App.genome, f = App.fish; if (!g || !f) { body.textContent = 'No fish.'; return; } const d = App.debug;
-    const m = g.meta.metrics || metrics(g); const fa = m.finAreaFractions; const viol = violations(g);
-    body.innerHTML = `<div class="row"><label><input type="checkbox" id="dbgWire"${d.wire ? ' checked' : ''}> wireframe</label><label><input type="checkbox" id="dbgSkel"${d.skeleton ? ' checked' : ''}> skeleton / fin rays</label><label><input type="checkbox" id="dbgLm"${d.landmarks ? ' checked' : ''}> landmarks</label></div>
-      <div class="grp">Metrics</div><table><tr><td>Fineness ratio</td><td>${m.fineness}</td></tr><tr><td>Caudal aspect ratio (genome / measured)</td><td>${m.caudalAR} / ${f.info.caudalAR}</td></tr><tr><td>Relative gape (gape / L)</td><td>${m.relGape} (${m.gapeOfHead} of head depth)</td></tr><tr><td>Fin area ÷ lateral body area</td><td>dorsal ${fa.dorsal} · anal ${fa.anal} · pectoral ${fa.pectoral} · pelvic ${fa.pelvic} · caudal ${fa.caudal}</td></tr><tr><td>Triangles</td><td>${f.info.tris.toLocaleString()} (budget 40,000)</td></tr><tr><td>Size class</td><td>${g.meta.sizeClass} · ${g.body.length.toFixed(3)} m</td></tr><tr><td>Tags</td><td>${esc((g.meta.tags || []).join(', '))}</td></tr></table>
-      <div class="grp">Landmarks (u)</div><table>${Object.entries(g.meta.landmarks || landmarks(g)).map(([k, v]) => `<tr><td>${k}</td><td>${(+v).toFixed(3)}</td></tr>`).join('')}</table>
-      <div class="grp">Rule repairs applied (${g.meta.repairs.length}) · outstanding violations: <span class="${viol.length ? 'bad' : 'ok'}">${viol.length}</span></div><table><tr><th>rule</th><th>path</th><th>from</th><th>to</th></tr>${g.meta.repairs.slice(0, 120).map(r => `<tr><td>${esc(r.rule)}</td><td>${esc(r.path)}</td><td>${esc(JSON.stringify(r.from))}</td><td>${esc(JSON.stringify(r.to))}</td></tr>`).join('') || '<tr><td colspan="4">none — sampled genome satisfied every rule</td></tr>'}</table>
-      <div class="grp">Rules table (${RULES.length})</div><table>${RULES.map(r => `<tr><td><code>${r.id}</code></td><td>${esc(r.desc)}</td></tr>`).join('')}</table>`;
-    body.querySelector('#dbgWire').onchange = e => { d.wire = e.target.checked; updateDebugHelpers(); }; body.querySelector('#dbgSkel').onchange = e => { d.skeleton = e.target.checked; updateDebugHelpers(); }; body.querySelector('#dbgLm').onchange = e => { d.landmarks = e.target.checked; updateDebugHelpers(); };
-  },
-  tests(body) {
-    body.innerHTML = `<p class="god-copy">Quick checks cover goldfish in the hadal habitat, visible bounded mutation steps, replay/import, missing fin curves and removal of cone horns. Full tests also cover every reference species and 200 genomes per habitat.</p><div class="row"><button id="focusedTests" class="primary">Quick Regression Check</button></div><div class="row"><label><input type="checkbox" id="testExhaustive"> Exhaustive geometry (slower)</label></div><div class="row"><button id="runTests">Full Anatomy Tests</button><button id="cancelTests" class="sm">Cancel</button><span id="testProg" class="mut"></span></div><div id="testOut"></div>`;
-    body.querySelector('#focusedTests').onclick = e => {
-      if (TEST_STATE.running) return; e.target.disabled = true;
-      const output = body.querySelector('#testOut');
-      setTimeout(() => { try { const rows = runFocusedTests(); output.innerHTML = `<table><tr><th>Check</th><th>Result</th></tr>${rows.map(row => `<tr><td>${esc(row.name)}</td><td class="${row.pass ? 'ok' : 'bad'}">${row.pass ? 'PASS' : esc(row.error)}</td></tr>`).join('')}</table>`; } finally { e.target.disabled = false; } }, 0);
-    };
-    body.querySelector('#runTests').onclick = async e => { e.target.disabled = true; try { await runSelfTest(body.querySelector('#testOut'), body.querySelector('#testProg'), body.querySelector('#testExhaustive').checked); } finally { e.target.disabled = false; } };
-    body.querySelector('#cancelTests').onclick = () => { TEST_STATE.cancel = true; };
-  },
-  help(body) {
-    body.innerHTML = `<h2 class="god-title">Form follows function.</h2><p class="god-copy">The engine inherits a body plan, samples correlated traits, repairs anatomy, then builds the fish. Bills and ray discs share the body loft. Detached cone horns are removed; brow and forehead contours stay part of the skin.</p>
-      <div class="grp">Species and habitats</div><p class="god-copy">Species and habitat selections can be combined. Incompatible combinations such as goldfish in a hadal trench create a labelled speculative concept, not a real population or a claim of survival. Anatomy is validated; pressure tolerance, respiration and fluid dynamics are not simulated.</p>
-      <div class="grp">Stepwise evolution</div><p class="god-copy">Use the mutation selector to target body depth, fin silhouette, fin growth, tail propulsion, or the head. Each click changes a functional unit by a bounded step, measures its post-repair proportions, and advances the counter. Adjacent fin shapes can change every third step. Limits stay anchored to the founding genome, so repeated clicks cannot grow the envelope indefinitely. Mutation strength is in God Mode; Undo restores the previous genome. Genome shows the exact trait changes. Skin-pattern seeds stay stable across the lineage.</p>
-      <div class="grp">Add data in index.html</div><table><tr><td>Clade</td><td>Add a K entry with its parent and changed traits. Add an ANATOMY delta only for a different construction foundation, and ECOLOGY_LIMITS for salinity/depth restrictions.</td></tr><tr><td>Niche</td><td>Add an NI entry: weighted compatible clades, function-to-form references and ranges. Add a linked ADAPTATIONS module if it introduces a new selective pressure.</td></tr><tr><td>Habitat</td><td>Add an H entry: weighted niches, natural palette, light, water, fog and procedural props. Fantasy habitats must be flagged.</td></tr><tr><td>Species</td><td>Add one SP entry with common/scientific names, clade, niche, native habitat and approximate trait ranges. It automatically appears in the gallery and pickers.</td></tr></table>
-      <div class="grp">Verification</div><p class="god-copy">Tests checks 200 seeded genomes and mutations per habitat, all reference-species geometries, deterministic generation, crossover, bilateral symmetry, loft-projected attachment tolerance and triangle budgets. Enable exhaustive geometry to build both detail levels for every generated fish. Results are computed on your device, never pre-filled.</p>
-      <div class="grp">Known limitations</div><p class="god-copy">These are procedural approximations, not scan-derived, photographically verified fish. Eye rims conform to the skin; fin rays and micro-scales are procedural shading, not individual skeletal or scale meshes. Surface joins are not fully watertight and some complex clades remain stylized. GLB preserves geometry and approximate vertex pigmentation, not the custom shaders. Photographic indistinguishability is not guaranteed; visual quality and frame rate depend on the device.</p>
-      <div class="grp">Anatomical reference</div><p class="god-copy"><a href="https://www.pc.maricopa.edu/Biology/ppepe/BIO145/lab04_1.html" target="_blank" rel="noopener noreferrer" style="color:var(--acc)">External shark anatomy, Phoenix College</a>: fin hierarchy, gill positions, ventral nares and heterocercal tails. Species ratios in the app are approximate authored envelopes.</p>`;
-  }
-};
-const fmt = v => Math.abs(v) >= 100 ? v.toFixed(0) : Math.abs(v) >= 10 ? v.toFixed(1) : v.toFixed(3);
-let editTimer = 0; function applyEdit(path, value) { const g = App.genome; if (!g) return; setP(g, path, value); g.meta.godMode = GOD.enabled; g.meta.parentSpecies = g.meta.species || g.meta.parentSpecies; g.meta.species = null; g.meta.edited = true; clearTimeout(editTimer); editTimer = setTimeout(() => { try { g.meta.repairs = []; finalize(g); setFish(g, { noHistory: true, keepCamera: true }); } catch (e) { showError(e); } }, 140); }
-function syncInspector() { const g = App.genome; for (const [p, { input, val, e }] of inspectorState.inputs) { const v = getP(g, p); if (document.activeElement === input) continue; if (e.t === 'n' || e.t === 'i') { input.value = v; if (val) val.textContent = fmt(v); } else if (e.t === 's') input.value = v; else if (e.t === 'b') input.checked = !!v; else input.value = hslToHex(v[0], v[1], v[2]); } }
-/* ── thumbnails (gallery) ── */
-const thumbQueue = []; let thumbBusy = false, thumbR = null, thumbScene = null, thumbCam = null;
-function requestThumb(id, img) { thumbQueue.push({ id, img }); pumpThumbs(); }
-// @@PART js/app.part15.js (15/19) lines 2938-3227 of the original module script -- stripped by build.mjs
-async function pumpThumbs() {
-  if (thumbBusy) return; thumbBusy = true;
-  try { if (!thumbR) { const cv = document.createElement('canvas'); cv.width = 260; cv.height = 182; thumbR = new THREE.WebGLRenderer({ canvas: cv, antialias: true, alpha: true, preserveDrawingBuffer: true }); thumbR.outputColorSpace = THREE.SRGBColorSpace; thumbR.toneMapping = THREE.ACESFilmicToneMapping; thumbScene = new THREE.Scene(); thumbCam = new THREE.PerspectiveCamera(32, 260 / 182, 0.01, 100); }
-    while (thumbQueue.length) { const { id, img } = thumbQueue.shift(); if (!img.isConnected) continue; let fish = null;
-      try { const g = generate({ species: id, seed: 'gallery' }); fish = buildFish(g, { quality: 'med' }); thumbScene.add(fish.group); const saved = { fog: ENV.uFogDensity.value, ld: ENV.uLightDir.value.clone(), lc: ENV.uLightCol.value.clone(), sk: ENV.uSkyCol.value.clone(), gr: ENV.uGroundCol.value.clone() };
-        ENV.uFogDensity.value = 0; ENV.uLightDir.value.set(0.45, 0.8, 0.6).normalize(); ENV.uLightCol.value.setRGB(1.05, 1.03, 1); ENV.uSkyCol.value.setRGB(0.62, 0.66, 0.72); ENV.uGroundCol.value.setRGB(0.22, 0.21, 0.22);
-        const box = fish.info.bounds, c2 = box.getCenter(new THREE.Vector3()), r = box.getSize(new THREE.Vector3()).length() * 0.5;
-        const ray = ['ray', 'benthicShark'].includes(fish.bm.a.family), dist = r / Math.sin(thumbCam.fov * Math.PI / 360) * (ray ? 1.35 : 1.02);
-        thumbCam.position.copy(c2).add((ray ? new THREE.Vector3(.1, .95, .27) : new THREE.Vector3(.3, .2, 1)).normalize().multiplyScalar(dist)); thumbCam.near = dist * 0.01; thumbCam.far = dist * 10; thumbCam.lookAt(c2); thumbCam.updateProjectionMatrix();
-        thumbR.setClearColor(0x0b1a26, 1); thumbR.render(thumbScene, thumbCam); img.src = thumbR.domElement.toDataURL('image/jpeg', 0.85);
-        ENV.uFogDensity.value = saved.fog; ENV.uLightDir.value.copy(saved.ld); ENV.uLightCol.value.copy(saved.lc); ENV.uSkyCol.value.copy(saved.sk); ENV.uGroundCol.value.copy(saved.gr); }
-      catch (e) { console.warn('thumb failed', id, e); }
-      finally { if (fish) { thumbScene.remove(fish.group); fish.dispose(); } }
-      await new Promise(r => setTimeout(r, 0)); } }
-  finally { thumbBusy = false; }
+    if (App.env && App.env.shafts && App.env.shafts.visible) for (const m of App.env.shafts.children) m.rotation.y = Math.atan2(camera.position.x - m.position.x, camera.position.z - m.position.z);
+    if (App.cameraTween) { const v = App.cameraTween, q = clamp((now - v.start) / v.duration, 0, 1), ease = smoother(q); camera.position.lerpVectors(v.from, v.to, ease); controls.target.lerpVectors(v.startTarget, v.target, ease); if (q === 1) { App.cameraTween = null; controls.enableDamping = true; } }
+    controls.update(); renderer.render(scene, camera);
+  } catch (e) { showError(e); }
 }
-/* ── GLB export (bakes standard materials) ── */
-function pigmentAt(g, u, ang, out) {
-  const s = g.skin, raw = g.body.roll ? Math.sin(ang * TAU) : -Math.cos(ang * TAU);
-  const vert = anatomyProfile(g).family === 'ray' ? clamp(raw * 5, -1, 1) : raw;
-  out.copy(hslCol(s.base)).lerp(hslCol(s.belly), s.countershade * (1 - sstep(-.38, .48, vert)));
-  const fract = x => x - Math.floor(x), freq = s.patternScale, seed = cyrb128(g.meta.surfaceSeed || g.meta.seed)[0] % 1000;
-  let mask = 0;
-  if (s.pattern === 'bars') mask = sstep(.27, .38, Math.abs(fract(u * g.body.fineness * 1.1 * freq) - .5));
-  else if (s.pattern === 'stripes') mask = sstep(.3, .4, Math.abs(fract(vert * 1.6 * freq) - .5));
-  else if (s.pattern === 'spots') { const x = u * g.body.fineness * 3.5 * freq, y = vert * 3.2 * freq, h = fract(Math.sin(Math.floor(x) * 127.1 + Math.floor(y) * 311.7 + seed) * 43758.5453); mask = (1 - sstep(.13, .24, Math.hypot(fract(x) - .5, fract(y) - .5))) * (h > .2 ? 1 : 0); }
-  else if (['mottle', 'disruptive', 'reticulate', 'saddles'].includes(s.pattern)) mask = sstep(.22, .7, .5 + .5 * Math.sin(u * 36 * freq + Math.sin(vert * 17 + seed) * 3));
-  else if (s.pattern === 'eyespot') mask = 1 - sstep(.7, .9, Math.hypot((u - .74) * g.body.fineness, vert - .25) / (.35 * freq));
-  out.lerp(hslCol(s.accent), mask * s.patternStrength);
-  if (s.band > 0) out.lerp(hslCol(s.bandColor), (1 - sstep(.07, .2, Math.abs(vert - .02))) * sstep(.1, .3, u) * s.band);
-  return out;
+/* ╔══════════════════════════════════════════════════════════════════╗
+   ║ 11. UI, PANELS, EXPORT, SELF-TEST, BOOT                          ║
+   ╚══════════════════════════════════════════════════════════════════╝ */
+const $ = id => document.getElementById(id);
+let toastTimer = 0; function toast(msg) { const t = $('toast'); t.textContent = msg; t.style.opacity = 1; clearTimeout(toastTimer); toastTimer = setTimeout(() => { t.style.opacity = 0; }, 2600); }
+function showError(e) { console.error(e); window.__fgShowError(e && e.stack ? e.stack : String(e)); }
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+function download(blob, name) { const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000); }
+const b64enc = s => btoa(unescape(encodeURIComponent(s))), b64dec = s => decodeURIComponent(escape(atob(s)));
+function populateSelects() {
+  const h = $('selHabitat'); h.innerHTML = Object.values(HABITATS).map(x => `<option value="${x.id}">${esc(x.n)}</option>`).join('');
+  const n = $('selNiche'); n.innerHTML = '<option value="">Niche: auto</option>' + Object.values(NICHES).map(x => `<option value="${x.id}">${esc(x.n)}${x.fantasy ? ' ✨' : ''}</option>`).join('');
+  const c2 = $('selClade'); const rows = []; const walk = (id, depth) => { rows.push(`<option value="${id}">${'· '.repeat(depth)}${esc(CLADES[id].n)}</option>`); Object.values(CLADES).filter(k => k.p === id).forEach(k => walk(k.id, depth + 1)); }; walk('fish', 0); c2.innerHTML = '<option value="">Clade: auto</option>' + rows.join('');
+  const s = $('selSpecies'); const byHab = {}; for (const sp of SPECIES) (byHab[sp.habitat] = byHab[sp.habitat] || []).push(sp); s.innerHTML = '<option value="">Species: none</option>' + Object.keys(byHab).map(hid => `<optgroup label="${esc(HABITATS[hid].n)}">` + byHab[hid].map(sp => `<option value="${sp.id}">${esc(sp.n)}</option>`).join('') + '</optgroup>').join('');
 }
-function exportGLB(name) {
-  const f = App.fish; if (!f) return;
-  const group = new THREE.Group(), geometries = [], materials = [], color = new THREE.Color(); group.rotation.x = f.group.rotation.x;
-  const cleanup = () => { geometries.forEach(g => g.dispose()); materials.forEach(m => m.dispose()); };
+function currentOpts() { return { habitat: $('selHabitat').value || undefined, niche: $('selNiche').value || undefined, clade: $('selClade').value || undefined, species: $('selSpecies').value || undefined, seed: $('seed').value.trim() || undefined }; }
+function doGenerate(opts) {
+  clearTimeout(GOD.timer); clearTimeout(editTimer);
   try {
-    f.group.traverse(o => {
-      if (!o.isMesh) return;
-      const source = o.geometry, geo = new THREE.BufferGeometry(), pos = source.getAttribute('position');
-      geo.setAttribute('position', pos.clone()); if (source.getAttribute('normal')) geo.setAttribute('normal', source.getAttribute('normal').clone()); if (source.index) geo.setIndex(source.index.clone());
-      const body = source.getAttribute('aBody'), fin = source.getAttribute('aFin'), skin = source.getAttribute('aSkin'), eye = f.materials._eyes.includes(o.material), glow = o.material === f.materials.glow, tooth = o.material === f.materials.tooth;
-      const colors = new Float32Array(pos.count * 3);
-      for (let i = 0; i < pos.count; i++) {
-        if (tooth) color.setRGB(.82, .78, .68);
-        else if (glow) color.copy(f.uniforms.uGlow.value);
-        else if (eye) { const ae = source.getAttribute('aEye'), k = ae ? ae.getZ(i) : 0; color.copy(k === 2 ? new THREE.Color(.008, .008, .009) : k === 1 ? o.material.uniforms.uEyeCol.value : k === 0 ? new THREE.Color(.62, .6, .55) : new THREE.Color(.3, .3, .3)); }
-        else if (body) { pigmentAt(App.genome, body.getX(i), body.getY(i), color); if (body.getZ(i) > .5 && body.getZ(i) < 2 || body.getZ(i) > 5.4 && body.getZ(i) < 6.6) color.setRGB(.019, .007, .009); }
-        else if (skin) { pigmentAt(App.genome, skin.getX(i), skin.getY(i), color); if (skin.getZ(i) < .5) color.lerp(f.uniforms.uFinCol.value, sstep(.06, .42, fin.getY(i))); }
-        else color.copy(f.uniforms.uBase.value);
-        colors[i * 3] = color.r; colors[i * 3 + 1] = color.g; colors[i * 3 + 2] = color.b;
-      }
-      geo.setAttribute('color', new THREE.BufferAttribute(colors, 3)); geometries.push(geo);
-      const transparent = !!skin && !f.bm.a.solid;
-      const material = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: eye ? .12 : .42, metalness: 0, transparent, opacity: transparent ? .78 : 1, side: THREE.DoubleSide, emissive: glow ? f.uniforms.uGlow.value.clone() : new THREE.Color(0) }); materials.push(material);
-      if (o.isInstancedMesh) { const matrix = new THREE.Matrix4(); for (let i = 0; i < o.count; i++) { o.getMatrixAt(i, matrix); const mesh = new THREE.Mesh(geo, material); mesh.applyMatrix4(matrix); group.add(mesh); } }
-      else group.add(new THREE.Mesh(geo, material));
+    opts = opts || currentOpts();
+    if (!opts.seed) { opts.seed = Math.floor(Math.random() * 1e9).toString(36); $('seed').value = opts.seed; }
+    const g = generate(opts); syncSelects(g); setFish(g);
+  } catch (e) { if (e instanceof RangeError) toast(e.message); else showError(e); }
+}
+function syncSelects(g) { $('selHabitat').value = g.meta.habitat; $('seed').value = g.meta.seed; }
+/** Top-bar "name → creature": species name (optionally + habitat words) or a free description; species are adapted to the chosen habitat. */
+function convertFromName() {
+  const text = $('nameInput').value.trim(); if (!text) { toast('Type a species name or describe a creature.'); return; }
+  try {
+    const sp = findSpecies(text), habitat = findHabitat(text) || $('selHabitat').value || undefined, seed = cyrb128(text + '|' + (habitat || '')).toString(36);
+    const g = sp ? generate({ species: sp.id, habitat, seed: 'name:' + seed }) : genomeFromText(text, 'txt:' + seed, habitat);
+    syncSelects(g); setFish(g);
+    toast(sp ? (g.meta.adapted ? sp.n + ' adapted to ' + HABITATS[g.meta.habitat].n : sp.n + ' in its native habitat') : 'Interpreted as ' + CLADES[g.meta.clade].n.toLowerCase() + ' / ' + NICHES[g.meta.niche].n.toLowerCase());
+  } catch (e) { if (e instanceof RangeError) toast(e.message); else showError(e); }
+}
+/** Invent within one body plan and one habitat; the seed fully determines the result. */
+function invent(habId, seed) {
+    const hab = HABITATS[habId]; if (!hab) throw new Error('Unknown discovery habitat');
+    const rng = new RNG('disc:' + seed);
+    const a = generate({ habitat: habId, noSpecies: true, seed: 'disc-a-' + seed });
+    /* sister lineage: a nearby leaf clade (tree distance ≤ 3) that is ecologically valid for this habitat */
+    const isLeaf = id => !Object.values(CLADES).some(k => k.p === id);
+    const plan = anatomyProfile(a);
+    const sisters = Object.keys(CLADES).filter(id => {
+      if (!isLeaf(id) || id === a.meta.clade || cladeDistance(a.meta.clade, id) > 3 || !cladeAllowed(id, hab)) return false;
+      const other = anatomyProfile({ meta: { clade: id } });
+      return other.family === plan.family && other.gills === plan.gills && cladeInNiche(id, NICHES[a.meta.niche]);
     });
-    group.userData = { genome: stripGenome(App.genome), pose: 'neutral', pigmentBake: 'approximate vertex colors' };
-    new GLTFExporter().parse(group, result => { download(new Blob([result], { type: 'model/gltf-binary' }), name + '.glb'); cleanup(); toast('GLB exported with anatomy and baked pigmentation.'); }, error => { cleanup(); toast('GLB export failed: ' + (error.message || error)); }, { binary: true });
-  } catch (error) { cleanup(); showError(error); }
+    const sisterClade = sisters.length && rng.chance(.75) ? rng.pick(sisters) : a.meta.clade;
+    const b = generate({ habitat: habId, clade: sisterClade, niche: a.meta.niche, noSpecies: true, seed: 'disc-b-' + seed });
+    let child; try { child = breed(a, b, 'disc-x-' + seed); } catch (err) { child = a; }
+    child = mutate(child, .25, 'disc-m-' + seed);
+    child.meta.habitat = habId; child.meta.niche = a.meta.niche; child.meta.species = null; child.meta.parentSpecies = null;
+    child.meta.adapted = null; child.meta.novel = true; child.meta.repairs = [];
+    delete child.meta.evolution; delete child.meta.mutation;
+    finalize(child);
+    return child;
 }
-/* ── self test ── */
-const TEST_STATE = { running: false, cancel: false, last: null };
-function runFocusedTests() {
-  const rows = [], assert = (condition, message) => { if (!condition) throw new Error(message); };
-  const test = (name, fn) => { try { fn(); rows.push({ name, pass: true }); } catch (error) { rows.push({ name, pass: false, error: error.message }); } };
-  test('Goldfish + hadal habitat creates a labelled speculative form', () => {
-    const g = generate({ species: 'goldfish', habitat: 'hadal', seed: 'goldfish-hadal-regression' });
-    assert(g.meta.habitat === 'hadal' && g.meta.species === 'goldfish', 'Species or habitat was discarded');
-    assert(g.meta.speculative && g.meta.adapted.speculative, 'Impossible habitat was presented as a real population');
-    assert(violations(g).length === 0, 'Unrepaired anatomical constraints');
-  });
-  test('Goldfish creates in every habitat without selection errors', () => {
-    for (const habitat in HABITATS) { const g = generate({ species: 'goldfish', habitat, seed: 'all-habitats-regression' }); assert(g.meta.habitat === habitat && violations(g).length === 0, habitat + ' was not preserved or failed constraints'); }
-  });
-  test('Eight body/fin mutation steps make visible, bounded changes', () => {
-    let g = generate({ species: 'goldfish', seed: 'step-regression' });
-    const targets = ['agility', 'display', 'finShape', 'tail', 'speed', 'feeding', 'agility', 'finShape'];
-    for (let i = 0; i < targets.length; i++) {
-      const before = deepClone(g); g = mutate(g, .55, 'step-regression-' + i, targets[i]);
-      assert(g.meta.evolution.step === i + 1, 'Step counter did not advance');
-      assert(morphologyDifference(before, g) >= .025, 'Mutation is effectively a no-op');
-      assert(violations(g).length === 0, 'Mutation failed anatomical rules');
-      for (const p in g.meta.evolution.origin) {
-        const lim = mutationBounds(g, p, g.meta.evolution), value = getP(g, p);
-        assert(value >= lim.min - 1e-6 && value <= lim.max + 1e-6, p + ' escaped the founding envelope');
-      }
-    }
-  });
-  test('Mutation is repeatable and preserves the skin pattern seed', () => {
-    const source = generate({ species: 'rainbow-trout', seed: 'deterministic-mutation' });
-    const a = mutate(source, .55, 'shared-mutation-seed', 'finShape'), b = mutate(source, .55, 'shared-mutation-seed', 'finShape');
-    assert(JSON.stringify(stripGenome(a)) === JSON.stringify(stripGenome(b)), 'Seeded mutation differs on replay');
-    assert(a.meta.surfaceSeed === source.meta.surfaceSeed && source.meta.species === 'rainbow-trout', 'Source genome or pattern seed was altered');
-  });
-  test('JSON import preserves evolution anchors and adaptation labels', () => {
-    const source = generate({ species: 'goldfish', habitat: 'hadal', seed: 'import-regression' });
-    const evolved = mutate(source, .55, 'import-step', 'finShape');
-    const imported = validateGenome(JSON.parse(JSON.stringify(stripGenome(evolved)))).genome; finalize(imported);
-    assert(imported.meta.evolution.step === 1 && imported.meta.speculative, 'Evolution or speculative label was dropped');
-    assert(JSON.stringify(imported.meta.evolution.origin) === JSON.stringify(evolved.meta.evolution.origin), 'Evolution envelope changed on import');
-  });
-  test('No cone horns; every pectoral shape curve is defined', () => {
-    const g = generate({ clade: 'scorpaenid', habitat: 'coralReef', noSpecies: true, seed: 'ornament-regression' });
-    assert(g.head.special !== 'horns', 'Cone head ornament remains enabled');
-    for (const shape of SCHEMA['fins.pectoral.shape'].opts) assert(typeof PECT_SHAPE[shape] === 'function' && isNum(PECT_SHAPE[shape](.5)), 'Missing ' + shape + ' fin profile');
-  });
-  for (const species of ['goldfish', 'pacific-sardine', 'red-lionfish', 'milkfish', 'blue-marlin']) test(species + ' builds valid hero and school geometry', () => {
-    const g = generate({ species, seed: 'focused-geometry' });
-    for (const quality of ['hero', 'lod']) {
-      const fish = buildFish(g, { quality });
-      try { const result = checkFishGeometry(fish); assert(result.errors.length === 0, quality + ': ' + result.errors.join('; ')); }
-      finally { fish.dispose(); }
-    }
-  });
-  runHybridTests(test, assert);
-  TEST_STATE.focused = rows; return rows;
-}
-FG.runFocusedTests = runFocusedTests;
-function checkFishGeometry(fish) {
-  const g = fish.bm.g, L = fish.bm.L, errors = [], q = QUALITY[fish.info.quality], tol = Math.max(L * 1e-6, 1e-9);
-  for (const geo of fish.geos) for (const name of ['position', 'normal']) {
-    const attr = geo.getAttribute(name); if (attr && !attr.array.every(Number.isFinite)) errors.push('Non-finite ' + name);
-  }
-  const pos = fish.parts.body.geometry.getAttribute('position'), fins = fish.parts.fins.geometry.getAttribute('position');
-  let asym = 0, maxRootError = 0;
-  for (let s = 0; s < fish.bm.loft.us.length; s += 3) for (let j = 1; j < q.R / 2; j++) {
-    const a = s * q.R + j, b = s * q.R + q.R - j;
-    if (Math.abs(pos.getX(a) - pos.getX(b)) > tol || Math.abs(pos.getY(a) - pos.getY(b)) > tol || Math.abs(pos.getZ(a) + pos.getZ(b)) > tol) asym++;
-  }
-  const p = {};
-  for (const root of fish.info.attachments) {
-    fish.bm.attachedSurface(root.u, root.theta, p);
-    maxRootError = Math.max(maxRootError, Math.max(0, Math.hypot(fins.getX(root.index) - p.x, fins.getY(root.index) - p.y, fins.getZ(root.index) - p.z) - (root.allow || 0)));
-    if (root.u < 0 || root.u > 1) errors.push('Attachment outside landmark axis');
-  }
-  if (asym) errors.push('Body lost bilateral symmetry');
-  if (maxRootError > tol) errors.push('Fin roots detached from skin');
-  if (fish.bm.billStart !== null) {
-    const uv = fish.parts.body.geometry.getAttribute('aBody');
-    if (uv.getX(0) > -.04 || fish.bm.loft.us[0] >= 0) errors.push('Bill is not part of the continuous body loft');
-  }
-  if (fish.bm.a.family === 'ray' || fish.bm.a.family === 'benthicShark') {
-    let minZ = Infinity, maxZ = -Infinity, minY = Infinity, maxY = -Infinity;
-    for (let i = 0; i < pos.count; i++) { minZ = Math.min(minZ, pos.getZ(i)); maxZ = Math.max(maxZ, pos.getZ(i)); minY = Math.min(minY, pos.getY(i)); maxY = Math.max(maxY, pos.getY(i)); }
-    /* flattened plan: a disc (width ≫ thickness), its margin built by the fin constructor and rooted on the disc edge, no hinged jaw on the full form */
-    if (fish.bm.law.flat.flat >= 1 && (maxZ - minZ) / Math.max(L * .01, maxY - minY) < 2.2) errors.push('Flattened plan is not a disc');
-    const att = (fish.info.attachments || []).filter(x => x.kind === 'pectoral');
-    if (!att.length) errors.push('Flattened plan margin fin is not rooted on the disc');
-    if (fish.parts.jaw && fish.bm.law.flat.flat >= 1) errors.push('Flattened plan has a hinged jaw');
-  }
-  if (fish.parts.jaw) {
-    const tissue = fish.parts.jaw.geometry.getAttribute('aBody');
-    for (let i = 0; i < tissue.count; i++) if (tissue.getZ(i) !== 0) { errors.push('Mouth contains a flat cavity shelf'); break; }
-  }
-  if (g.meta.species === 'goldfish' && (g.body.fineness > 2.05 || g.fins.caudal.type !== 'fantail')) errors.push('Goldfish body or tail is not the reference fantail form');
-  if (g.head.special === 'horns') errors.push('Detached cone ornament was not removed');
-  /* mouth law audit: the interior cavity is a pocket inside the head (never a tunnel), ≤ 0.35 head length deep; teeth only on the jaw margins */
-  { const bm = fish.bm, fr = {}, s = {}; let out = 0, deepest = 0;
-    const inBody = (x, y, z, slack) => { const u = clamp((bm.headX - x) / L, .003, .999); bm.frame(u, fr); bm.section(u, s); const ly = (x - fr.px) * fr.nx + (y - fr.py) * fr.ny; return ly > -s.dDn * slack && ly < s.dUp * slack && Math.abs(z) <= bm.halfWidthAtY(s, clamp(ly, -s.dDn * .99, s.dUp * .99)) * slack + 1e-6; };
-    for (const m of fish.group.children) { const ab = m.geometry.getAttribute('aBody'); if (!ab || m.material !== fish.materials.jaw || !(ab.getZ(0) >= 1 && ab.getZ(0) < 2) || bm.ventralMouth || bm.oralDisc) continue; const P = m.geometry.getAttribute('position');
-      for (let i = 0; i < P.count; i++) { if (!inBody(P.getX(i), P.getY(i), P.getZ(i), 1.02)) out++; deepest = Math.max(deepest, (bm.headX - P.getX(i)) / L); } }
-    if (out) errors.push('Mouth cavity breaks out of the head'); if (deepest > Math.max(bm.mcU, bm.hingeU || 0) + LAW.CAVITY_MAX * bm.h + 1e-6) errors.push('Mouth cavity deeper than 0.35 head length');
-    if (fish.parts.teeth) { const M = new THREE.Matrix4(), P = new THREE.Vector3(); for (let i = 0; i < fish.parts.teeth.count; i++) { fish.parts.teeth.getMatrixAt(i, M); P.setFromMatrixPosition(M); const u = (bm.headX - P.x) / L; if (u < bm.jawStartU - .01 || u > Math.max(bm.mcU, bm.hingeU || 0) + 1e-6 || !inBody(P.x, P.y, P.z, 1.08)) { errors.push('Teeth outside the jaw margins'); break; } } } }
-  if (!fish.bm.oralDisc || true) errors.push(...FG.round2Check(fish.bm));   /* round 2: see-through mouth / teeth rooting / eye protrusion */
-  errors.push(...auditAnatomy(fish, THREE));
-  const budget = fish.info.quality === 'lod' ? 2500 : 40000;
-  if (fish.info.tris > budget) errors.push('Triangle budget exceeded');
-  const un = violations(g); if (un.length) errors.push(un.length + ' unrepaired constraints');
-  return { errors: [...new Set(errors)], maxRootError, asym, tris: fish.info.tris };
-}
-async function runSelfTest(out, prog, exhaustive = false) {
-  if (TEST_STATE.running) { toast('Tests are already running.'); return; }
-  TEST_STATE.running = App.testing = true; TEST_STATE.cancel = false;
-  const rows = [], issues = [], beforePause = App.paused; App.paused = true; out.innerHTML = '';
-  const yieldFrame = () => new Promise(resolve => setTimeout(resolve, 0));
-  const show = () => {
-    out.innerHTML = `<div style="overflow:auto"><table><tr><th>Suite</th><th>Genomes</th><th>Mutations</th><th>Geometry</th><th>Hero / LOD tris</th><th>Result</th></tr>${rows.map(r => `<tr><td>${esc(r.name)}</td><td>${r.n}</td><td>${r.m}</td><td>${r.geo}</td><td>${r.hero.toLocaleString()} / ${r.lod.toLocaleString()}</td><td class="${r.fail ? 'bad' : 'ok'}">${r.fail ? 'FAIL (' + r.fail + ')' : 'PASS'}</td></tr>`).join('')}</table></div>`;
-    if (issues.length) { const pre = document.createElement('pre'); pre.style.cssText = 'font-size:10px;white-space:pre-wrap;color:#f4aba3'; pre.textContent = issues.slice(0, 25).join('\n'); out.appendChild(pre); }
-  };
-  const testGenome = (g, row, build) => {
-    row.n++;
-    let nan = false; for (const p in SCHEMA) { const v = getP(g, p), e = SCHEMA[p]; if ((e.t === 'n' || e.t === 'i') && !isNum(v) || e.t === 'hsl' && !(Array.isArray(v) && v.every(isNum))) nan = true; }
-    const problems = violations(g); if (nan || problems.length) { row.fail++; issues.push(`${row.name}: ${g.meta.clade}, seed ${g.meta.seed}: ${nan ? 'NaN' : problems.map(p => p.rule).join(', ')}`); }
-    if (build) for (const quality of ['hero', 'lod']) {
-      let fish;
-      try { fish = buildFish(g, { quality }); const check = checkFishGeometry(fish); row.geo++; row[quality === 'hero' ? 'hero' : 'lod'] = Math.max(row[quality === 'hero' ? 'hero' : 'lod'], check.tris); if (check.errors.length) { row.fail++; issues.push(`${g.meta.name} / ${quality}: ${check.errors.join(', ')}`); } }
-      catch (err) { row.fail++; issues.push(`${g.meta.name}: ${err.message}`); }
-      finally { if (fish) fish.dispose(); }
-    }
-  };
+FG.invent = invent;
+function doDiscover() {
+  clearTimeout(GOD.timer); clearTimeout(editTimer);
   try {
-    for (const hid of Object.keys(HABITATS)) {
-      const row = { name: HABITATS[hid].n, n: 0, m: 0, geo: 0, hero: 0, lod: 0, fail: 0 }; rows.push(row);
-      try {
-        const concept = invent(hid, 'novel-regression-' + hid);
-        testGenome(concept, row, true);
-        if (!concept.meta.novel || concept.meta.species || concept.meta.habitat !== hid || !cladeAllowed(concept.meta.clade, HABITATS[hid])) {
-          row.fail++; issues.push(`${hid}: invented fish failed habitat or novelty constraints`);
-        }
-      } catch (error) { row.fail++; issues.push(`${hid}: invention failed: ${error.message}`); }
-      for (let i = 0; i < 200 && !TEST_STATE.cancel; i++) {
-        const g = generate({ habitat: hid, seed: 'anatomy-test-' + i }); testGenome(g, row, exhaustive || i % 25 === 0);
-        const evolved = mutate(g, .85, 'mutation-test-' + hid + '-' + i); row.m++;
-        if (violations(evolved).length) { row.fail++; issues.push(`${hid}: mutation constraints failed (${g.meta.clade})`); }
-        if (i % 20 === 0) { prog.textContent = `${HABITATS[hid].n}: ${i + 1}/200`; show(); await yieldFrame(); }
-      }
+    const habId = $('selHabitat').value || (App.genome ? App.genome.meta.habitat : 'coralReef');
+    const child = invent(habId, Math.floor(Math.random() * 1e9).toString(36));
+    const cl = CLADES[child.meta.clade];
+    $('selSpecies').value = ''; $('selClade').value = ''; $('selNiche').value = ''; $('seed').value = '';
+    setFish(child); toast('New concept from the ' + cl.n.toLowerCase() + ' lineage, shaped for ' + HABITATS[habId].n + '.');
+  } catch (e) { showError(e); }
+}
+function doBreed() { if (App.history.length < 2) { toast('Generate a second fish first. Breed crosses the current fish with the previous one.'); return; } const a = App.history[App.history.length - 2], b = App.genome; try { const child = adaptFinish(hybridize(a, b, .5, a.meta.seed + 'x' + b.meta.seed + ':' + Math.floor(Math.random() * 1e6).toString(36)), b.meta.habitat, 'br' + Math.floor(Math.random() * 1e6).toString(36)); child.meta.evo = { step: 0, base: child.meta.name, nov: {}, don: null, hab: null, last: null, log: [] }; setFish(child); toast('Hybrid cross: ' + a.meta.name + ' + ' + b.meta.name); } catch (e) { toast(e.message); } }
+function updateHash() { if (!App.genome) return; if (App.genome.meta.proc && !App.genome.meta.edited) { try { history.replaceState(null, '', '#p=' + encodeURIComponent(App.genome.meta.proc.seed)); } catch (e) { /* sandboxed history */ } return; } const g = App.genome, m = g.meta; const q = new URLSearchParams({ s: m.seed, h: m.habitat, n: m.niche || '', c: m.clade, sp: m.species || '', g: b64enc(JSON.stringify(slimGenome(g))) }); try { history.replaceState(null, '', '#' + q.toString()); } catch (e) { /* Sandboxed or local-file history. */ } }
+function stripGenome(g) { const c2 = deepClone(g); delete c2.meta.metrics; delete c2.meta.landmarks; delete c2.meta.repairs; return c2; }
+function loadFromHash() { const q = new URLSearchParams(location.hash.slice(1)); if (q.get('p') && FG.proc) { FG.proc.showSeed(q.get('p')); return true; } if (!q.get('s') && !q.get('g')) return false; try { if (q.get('g')) { const { genome, issues } = validateGenome(JSON.parse(b64dec(q.get('g')))); genome.meta.repairs = issues.map(i => ({ rule: 'schema_validate', path: '-', from: '-', to: i })); finalize(genome); genome.meta.edited = true; syncSelects(genome); setFish(genome); return true; } const opts = { seed: q.get('s'), habitat: q.get('h') || undefined, niche: q.get('n') || undefined, clade: q.get('c') || undefined, species: q.get('sp') || undefined }; $('selHabitat').value = opts.habitat || ''; $('selNiche').value = opts.niche || ''; $('selClade').value = opts.clade || ''; $('selSpecies').value = ''; $('seed').value = opts.seed; doGenerate(opts); return true; } catch (e) { console.warn('hash load failed', e); return false; } }
+function updateHUD() {
+  const g = App.genome; if (!g) return; const m = g.meta;
+  $('fishName').innerHTML = esc(m.name) + (m.hybrid ? '<span class="badge" style="background:#b45309">HYBRID</span>' : m.novel ? '<span class="badge" style="background:#22644f">NEW CONCEPT</span>' : '')
+    + (m.speculative ? '<span class="badge" style="background:#7355a6">SPECULATIVE</span>' : m.fantasy ? '<span class="badge">FANTASY</span>' : '')
+    + (m.species ? '<span class="badge" style="background:#0e7490">' + (m.speculative ? 'REFERENCE LINEAGE' : 'SPECIES CARD') + '</span>' : '')
+    + (m.adapted ? '<span class="badge" style="background:#925614">HABITAT VARIANT</span>' : '');
+  $('fishSci').textContent = m.sci || '';
+  $('fishTags').textContent = `${HABITATS[m.habitat].n} / ${NICHES[m.niche] ? NICHES[m.niche].n : 'Generalist'} / ${CLADES[m.clade].n} / ${m.sizeClass} (${g.body.length.toFixed(2)} m) / ${g.swim.mode}` + (m.evoTraits && m.evoTraits.length ? ' / evolved: ' + m.evoTraits.join(', ') : '');
+  $('btnUndo').disabled = App.history.length < 2;
+  $('btnMutate').title = 'Evolve one generation (drift, gene flow, habitat selection or a new organ). Generation ' + (((m.evo && m.evo.step) || (m.evolution ? m.evolution.step : 0)) + 1) + ' next.';
+}
+function updateStats(fps) { const f = App.fish; $('stats').textContent = `${fps.toFixed(0)} fps · tier ${App.tier} · ${f ? f.info.tris.toLocaleString() : 0} tris · ${renderer.info.render.calls} draws${App.school && App.schoolOn ? ' · school ' + App.school.count : ''}`; }
+/* ── sheet / tabs ── */
+let currentTab = null; const inspectorState = { genome: null, inputs: new Map() };
+function openSheet(tab) { clearTimeout(GOD.timer); currentTab = tab; $('sheet').classList.remove('hidden'); document.querySelectorAll('[data-tab]').forEach(b => b.classList.toggle('active', b.dataset.tab === tab)); renderPanel(tab); onResize(); }
+function closeSheet() { clearTimeout(GOD.timer); currentTab = null; $('sheet').classList.add('hidden'); document.querySelectorAll('[data-tab]').forEach(b => b.classList.remove('active')); onResize(); }
+function refreshPanels() { if (!currentTab || currentTab === 'tests' || currentTab === 'text' || (currentTab === 'god' && GOD.editing)) return; if (currentTab === 'inspect' && inspectorState.genome === App.genome) { syncInspector(); return; } if (currentTab === 'gallery') return; renderPanel(currentTab); }
+function renderPanel(tab) { const body = $('sheetBody'); const titles = { mix: 'Hybrid Lab / lineage & adaptation report', evo: 'Evolution Lab / gradual mutation', god: 'God Mode / Evolution Workbench', inspect: 'Genome inspector', tree: 'Phylogeny', gallery: 'Reference gallery', text: 'Text to genome', export: 'Export & share', debug: 'Debug & rules', tests: 'Anatomy regression tests', proc: 'Procedural generator / seed, gallery & breeding', help: 'Anatomy Engine Guide' }; $('sheetTitle').textContent = titles[tab] || tab; body.innerHTML = ''; try { PANELS[tab](body); } catch (e) { showError(e); } }
+// @@PART js/app.part14.js (14/19) lines 2815-2937 of the original module script -- stripped by build.mjs
+const PANELS = {
+  god(body) {
+    const g = App.genome; if (!g) return;
+    if (!GOD.baseline || !GOD.editing) { GOD.baseline = deepClone(g); GOD.axes = {}; }
+    const a = anatomyProfile(g), protectedPaths = Object.keys(a.locks).length;
+    body.innerHTML = `<p class="gene-lock">AUTHORED EVOLUTION, NOT RANDOM GEOMETRY</p><h2 class="god-title">Create beyond the ordinary.</h2><p class="god-copy">Explore a broader range of form without breaking the fish. Every adjustment evolves linked structures; the ${a.label.toLowerCase()} foundation stays intact.</p>
+      <div class="god-switch"><div>God Mode<small>Extended variation. Biological safeguards always on.</small></div><button id="godToggle" class="${GOD.enabled ? 'primary' : ''}" aria-pressed="${GOD.enabled}">${GOD.enabled ? 'Enabled' : 'Enable'}</button></div>
+      <div class="camera-row"><button data-view="side">Side View</button><button data-view="top">Dorsal View</button><button data-view="head">Head View</button><button data-view="mouth">Mouth</button><button data-view="eye">Eye</button><button data-view="fin">Fin</button><button data-view="tail">Tail</button><button data-view="below">Below</button><button data-view="mouthbelow">Mouth below</button><button id="godPause">${App.paused ? 'Resume' : 'Pause'}</button></div>
+      <div class="grp">Anatomical foundation</div><div class="row"><select id="godLineage" aria-label="Anatomical lineage">${Object.values(CLADES).filter(k => !Object.values(CLADES).some(ch => ch.p === k.id)).map(k => `<option value="${k.id}"${k.id === g.meta.clade ? ' selected' : ''}>${esc(k.n)}</option>`).join('')}</select><button id="godEvolve" class="sm">Build Lineage</button></div>
+      <div class="grp">Linked adaptation axes</div><div id="godAxes"></div><div class="adaptation"><div class="adaptation-head"><label for="godStrength">Mutation Strength</label><output id="godStrengthOut">${Math.round(GOD.strength * 100)}%</output></div><input id="godStrength" type="range" min=".05" max="1" step=".01" value="${GOD.strength}"></div>
+      <div class="god-actions"><button class="primary" id="godMutate">Guided Mutation</button><button id="godUndo">Undo</button><button id="godReset">Reset Axes</button></div><div class="god-actions"><button id="godGenome">Detailed Genome</button><button id="godCheck">Validate Anatomy</button></div>
+      <div class="panel-note" id="godStatus">${protectedPaths} lineage traits protected. Mouth, gills, bilateral fin roots and tail propulsion are checked after every edit.</div>${evolutionReport(g)}`;
+    const axes = body.querySelector('#godAxes');
+    for (const id in ADAPTATIONS) {
+      const module = ADAPTATIONS[id], row = document.createElement('div'); row.className = 'adaptation';
+      row.innerHTML = `<div class="adaptation-head"><label for="axis-${id}">${module.label}</label><output>Balanced</output></div><p>${module.desc}</p><input id="axis-${id}" type="range" min="-1" max="1" step=".02" value="${GOD.axes[id] || 0}" aria-label="${module.label}">`;
+      row.querySelector('input').oninput = e => {
+        const v = +e.target.value; GOD.axes[id] = v; row.querySelector('output').textContent = v === 0 ? 'Balanced' : (v > 0 ? '+' : '') + Math.round(v * 100) + '%';
+        clearTimeout(GOD.timer); GOD.timer = setTimeout(() => {
+          try { const evolved = deepClone(GOD.baseline); evolved.meta.godMode = GOD.enabled; evolved.meta.parentSpecies = evolved.meta.species || evolved.meta.parentSpecies; evolved.meta.species = null; evolved.meta.edited = true; evolved.meta.repairs = [];
+            for (const key in GOD.axes) applyAdaptation(evolved, key, GOD.axes[key], GOD.enabled);
+            finalize(evolved); evolved.meta.name = 'Authored ' + evolved.meta.name.toLowerCase(); GOD.editing = true;
+            setFish(evolved, { noHistory: true, keepCamera: true }); GOD.editing = false;
+            const errors = violations(evolved); body.querySelector('#godStatus').textContent = errors.length ? `${errors.length} unresolved constraints. Open Debug for details.` : `Anatomy valid. ${evolved.meta.repairs.length} automatic corrections; roots sampled directly from the body surface.`;
+          } catch (err) { GOD.editing = false; showError(err); }
+        }, 130);
+      };
+      axes.appendChild(row);
+    }
+    body.querySelector('#godToggle').onclick = () => { GOD.enabled = !GOD.enabled; App.genome.meta.godMode = GOD.enabled; App.genome.meta.edited = true; updateHash(); renderPanel('god'); toast(GOD.enabled ? 'God Mode enabled. Biological constraints remain active.' : 'Species-range editing restored.'); };
+    body.querySelector('#godStrength').oninput = e => { GOD.strength = +e.target.value; body.querySelector('#godStrengthOut').textContent = Math.round(GOD.strength * 100) + '%'; };
+    body.querySelector('#godMutate').onclick = doMutate;
+    body.querySelector('#godUndo').onclick = undoFish;
+    body.querySelector('#godReset').onclick = () => { const base = deepClone(GOD.baseline); GOD.axes = {}; setFish(base, { keepCamera: true }); };
+    body.querySelector('#godGenome').onclick = () => openSheet('inspect');
+    body.querySelector('#godCheck').onclick = () => { const result = checkFishGeometry(App.fish); body.querySelector('#godStatus').textContent = result.errors.length ? result.errors.join('; ') : 'Validated: finite geometry, correct root attachment, bilateral body and triangle budget.'; };
+    body.querySelector('#godEvolve').onclick = () => { const id = body.querySelector('#godLineage').value; const evolved = generate({ clade: id, habitat: g.meta.habitat, seed: g.meta.seed + ':lineage:' + id, noSpecies: true }); evolved.meta.godMode = GOD.enabled; evolved.meta.edited = true; setFish(evolved); };
+    body.querySelector('#godPause').onclick = e => { App.paused = !App.paused; e.target.textContent = App.paused ? 'Resume' : 'Pause'; };
+    body.querySelectorAll('[data-view]').forEach(btn => btn.onclick = () => setCameraView(btn.dataset.view));
+  },
+  inspect(body) {
+    const g = App.genome; if (!g) { body.textContent = 'No fish yet.'; return; } inspectorState.genome = g; inspectorState.inputs.clear(); const map = resolveTraitMap(g.meta);
+    const head = document.createElement('div'); head.innerHTML = `<div><b>${esc(g.meta.name)}</b> <small>${esc(g.meta.sci)}</small></div><div class="row"><button class="sm" id="insReset">Regenerate from seed</button><button class="sm" id="insRandomSeed">New seed, same clade/niche</button>${g.skin.inflate ? '<button class="sm" id="insInflate">Inflate / deflate</button>' : ''}</div><small>${GOD.enabled ? 'Extended God Mode ranges.' : 'Clade, species and niche variation ranges.'} Disabled controls are anatomical foundations. Changes are repaired immediately; edited references become authored variants, not new claims about a real species.</small>`; body.appendChild(head);
+    head.querySelector('#insReset').onclick = () => doGenerate({ seed: g.meta.seed, habitat: g.meta.habitat, niche: g.meta.niche, clade: g.meta.clade, species: g.meta.species || undefined });
+    head.querySelector('#insRandomSeed').onclick = () => doGenerate({ habitat: g.meta.habitat, niche: g.meta.niche, clade: g.meta.clade, species: g.meta.species || undefined });
+    const inf = head.querySelector('#insInflate'); if (inf) inf.onclick = () => { App.inflateTarget = App.inflateTarget > 0.5 ? 0 : 1; };
+    const evolution = document.createElement('div'); evolution.innerHTML = evolutionReport(g); body.appendChild(evolution);
+    let grp = null; for (const p in SCHEMA) { const e = SCHEMA[p]; if (e.g !== grp) { grp = e.g; const h = document.createElement('div'); h.className = 'grp'; h.textContent = grp; body.appendChild(h); }
+      const row = document.createElement('div'); row.className = 'row'; const lab = document.createElement('label'); const spec = map[p]; lab.textContent = p.replace(/^(body|head|mouth|fins|swim|skin)\./, '').replace(/\./g, ' › ') + (spec && (spec.r || spec.c) ? ' •' : ''); row.appendChild(lab);
+      let input, val;
+      if (e.t === 'n' || e.t === 'i') { input = document.createElement('input'); input.type = 'range'; const lim = traitBounds(g, p, GOD.enabled, map); input.min = lim.min; input.max = lim.max; input.disabled = lim.locked; input.step = e.t === 'i' ? 1 : Math.max(.0001, (lim.max - lim.min) / 200); input.value = getP(g, p); val = document.createElement('span'); val.className = 'val'; val.textContent = fmt(getP(g, p)); input.oninput = () => { val.textContent = fmt(+input.value); applyEdit(p, e.t === 'i' ? Math.round(+input.value) : +input.value); }; }
+      else if (e.t === 's') { input = document.createElement('select'); input.innerHTML = e.opts.map(o => `<option${o === getP(g, p) ? ' selected' : ''}>${o}</option>`).join(''); input.onchange = () => applyEdit(p, input.value); }
+      else if (e.t === 'b') { input = document.createElement('input'); input.type = 'checkbox'; input.checked = !!getP(g, p); input.onchange = () => applyEdit(p, input.checked); }
+      else { input = document.createElement('input'); input.type = 'color'; const v = getP(g, p); input.value = hslToHex(v[0], v[1], v[2]); input.oninput = () => applyEdit(p, hexToHsl(input.value)); }
+      if (anatomyProfile(g).locks[p] !== undefined) { input.disabled = true; input.title = 'Protected anatomical foundation'; }
+      row.appendChild(input); if (val) row.appendChild(val); body.appendChild(row); inspectorState.inputs.set(p, { input, val, e }); }
+  },
+  tree(body) {
+    const g = App.genome; const cur = g ? g.meta.clade : 'fish'; const anc = new Set(cladePath(cur).map(n => n.id)); const nodes = {}; let leafY = 0; const rowH = 18, colW = 118;
+    const layout = (id, depth) => { const kids = Object.values(CLADES).filter(k => k.p === id); const node = { id, depth, kids: [] }; if (!kids.length) { node.y = leafY++ * rowH + 14; } else { for (const k of kids) node.kids.push(layout(k.id, depth + 1)); node.y = (node.kids[0].y + node.kids[node.kids.length - 1].y) / 2; } nodes[id] = node; return node; };
+    const root = layout('fish', 0); let maxD = 0; for (const id in nodes) maxD = Math.max(maxD, nodes[id].depth); const W = (maxD + 1) * colW + 160, Hh = leafY * rowH + 30; let svg = `<svg class="tree" width="${W}" height="${Hh}" viewBox="0 0 ${W} ${Hh}">`;
+    const draw = n => { const x = 16 + n.depth * colW; for (const k of n.kids) { const kx = 16 + k.depth * colW; svg += `<line x1="${x + 6}" y1="${n.y}" x2="${kx - 4}" y2="${k.y}"/>`; draw(k); } const cls = n.id === cur ? 'cur' : anc.has(n.id) ? 'anc' : ''; svg += `<g class="${cls}" data-clade="${n.id}"><circle cx="${x}" cy="${n.y}" r="4"/><text x="${x + 9}" y="${n.y + 4}">${esc(CLADES[n.id].n)}</text></g>`; };
+    draw(root); svg += '</svg>'; body.innerHTML = `<small>Ancestry of the current fish is highlighted. Tap any node to generate a fish from that clade in the current habitat.</small><div style="overflow:auto">${svg}</div>`;
+    body.querySelectorAll('g[data-clade]').forEach(el => el.addEventListener('click', () => { const id = el.dataset.clade; const hab = App.genome ? App.genome.meta.habitat : $('selHabitat').value; const desc = new Set([id]); const stack = [id]; while (stack.length) { const c2 = stack.pop(); for (const k of Object.values(CLADES)) if (k.p === c2 && !desc.has(k.id)) { desc.add(k.id); stack.push(k.id); } } const niches = Object.values(NICHES).filter(ni => Object.keys(ni.clades).some(c2 => desc.has(c2) || anc.has(c2) && c2 !== 'fish')); const hw = HABITATS[hab].niches; let niche = niches.find(ni => hw[ni.id]) || niches[0]; $('selClade').value = id; $('selNiche').value = niche ? niche.id : ''; $('selSpecies').value = ''; doGenerate({ habitat: hab, clade: id, niche: niche ? niche.id : undefined, seed: Math.floor(Math.random() * 1e9).toString(36) }); }));
+  },
+  gallery(body) {
+    const sel = document.createElement('select'); sel.innerHTML = '<option value="">All habitats</option>' + Object.values(HABITATS).filter(h => SPECIES.some(s => s.habitat === h.id)).map(h => `<option value="${h.id}">${esc(h.n)}</option>`).join(''); const grid = document.createElement('div'); grid.className = 'thumbs';
+    const fill = () => { grid.innerHTML = ''; thumbQueue.length = 0; for (const sp of SPECIES.filter(s => !sel.value || s.habitat === sel.value)) { const d = document.createElement('div'); d.className = 'thumb'; const img = document.createElement('img'); img.alt = sp.n; d.appendChild(img); const cap = document.createElement('div'); cap.innerHTML = `<b>${esc(sp.n)}</b><br><small>${esc(sp.sci)} · ${esc(HABITATS[sp.habitat].n)}</small>`; d.appendChild(cap); d.onclick = () => { $('selSpecies').value = sp.id; $('selHabitat').value = sp.habitat; doGenerate({ species: sp.id, habitat: sp.habitat, seed: 'ref' }); }; grid.appendChild(d); requestThumb(sp.id, img); } };
+    sel.onchange = fill; body.appendChild(sel); body.appendChild(document.createElement('br')); body.appendChild(grid); fill();
+  },
+  text(body) {
+    body.innerHTML = `<small>Describe a fish. The offline parser maps keywords to habitat, niche, clade, species cards, colours, pattern, size, shape and features; everything goes through schema validation and the rules engine.</small><textarea id="txtPrompt" placeholder="e.g. a slender silver reef barracuda with dark bars, or: glowing deep sea angler with huge fangs"></textarea><div class="row"><button class="primary" id="txtGo">Parse offline → generate</button><button id="txtLLM">Ask LLM endpoint</button></div><div class="grp">Optional LLM endpoint (POST JSON, returns JSON)</div><div class="row"><label>Endpoint URL</label><input type="url" id="llmUrl" placeholder="https://…" value="${esc(FG.llm.endpoint)}"></div><div class="row"><label>Bearer key</label><input type="password" id="llmKey" value="${esc(FG.llm.key)}"></div><div class="row"><label>Model</label><input type="text" id="llmModel" value="${esc(FG.llm.model)}"></div><small>Request body: {prompt, instruction, ids, schema}. Expected response: {"meta":{habitat,niche,clade},"overrides":{"schema.path":value}} or a full genome. Nothing from the model bypasses validation.</small><div id="txtOut" style="margin-top:8px"></div>`;
+    const save = () => { FG.llm.endpoint = body.querySelector('#llmUrl').value.trim(); FG.llm.key = body.querySelector('#llmKey').value; FG.llm.model = body.querySelector('#llmModel').value.trim(); safeStore.set('fg_llm_endpoint', FG.llm.endpoint); safeStore.set('fg_llm_key', FG.llm.key); safeStore.set('fg_llm_model', FG.llm.model); };
+    body.querySelector('#txtGo').onclick = () => { const p = body.querySelector('#txtPrompt').value; if (!p.trim()) return; try { const g = genomeFromText(p, 'txt:' + Math.floor(Math.random() * 1e6).toString(36)); syncSelects(g); setFish(g); body.querySelector('#txtOut').textContent = HABITATS[g.meta.habitat].n + ' / ' + NICHES[g.meta.niche].n + ' / ' + CLADES[g.meta.clade].n + ' / ' + g.meta.repairs.length + ' repairs'; } catch (e) { showError(e); } };
+    body.querySelector('#txtLLM').onclick = async () => { save(); const p = body.querySelector('#txtPrompt').value; const out = body.querySelector('#txtOut'); out.textContent = 'Asking endpoint…'; try { const g = await genomeFromLLM(p); syncSelects(g); setFish(g); out.innerHTML = `<small>LLM genome accepted after ${g.meta.repairs.length} validation/repair steps.</small>`; } catch (e) { out.innerHTML = `<span class="bad">${esc(e.message)}</span>`; } };
+    for (const id of ['llmUrl', 'llmKey', 'llmModel']) body.querySelector('#' + id).onchange = save;
+  },
+  export(body) {
+    body.innerHTML = `<div class="row"><button id="expJson">JSON Genome</button><button id="expGlb">GLB Model</button><button id="expPng">PNG Image</button><button id="expShare" class="primary">Copy Share Link</button></div><div class="row"><label>Import genome JSON</label><input type="file" id="impJson" accept="application/json"></div><small>JSON preserves all anatomical traits and the seed. GLB exports the neutral-pose anatomy with approximate vertex-baked patterns; micro-scales and shader animation stay in the app. Share links include the full validated genome, including authored changes.</small><pre id="expPreview" style="font-size:11px;max-height:30vh;overflow:auto;white-space:pre-wrap"></pre>`;
+    const g = App.genome; if (!g) return; const name = g.meta.name.replace(/[^a-z0-9]+/gi, '_');
+    body.querySelector('#expPreview').textContent = JSON.stringify(stripGenome(g), null, 1).slice(0, 4000) + '\n…';
+    body.querySelector('#expJson').onclick = () => download(new Blob([JSON.stringify(stripGenome(g), null, 2)], { type: 'application/json' }), name + '.json');
+    body.querySelector('#expPng').onclick = () => { renderer.render(scene, camera); const url = renderer.domElement.toDataURL('image/png'); const a = document.createElement('a'); a.href = url; a.download = name + '.png'; a.click(); };

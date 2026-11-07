@@ -1,147 +1,223 @@
-  const R = roleOf(g), P = AX(g), role = R.top, plan = planOf(g), upright = plan === 'upright';
-  const H = { dark: clamp(1 - Math.pow(hab.light, .35), 0, 1), deep: hab.tags.includes('deep'), cold: hab.tags.includes('cold') || ['abyssal', 'hadal'].includes(hab.id), flow: { fastRiver: 1, mountainStream: 1, slowRiver: .3, rockyShore: .5, kelpForest: .25 }[hab.id] || 0,
-    cover: ['coralReef', 'kelpForest', 'mangrove', 'floodplain', 'blackwater', 'crystalCavern', 'deepReef', 'rockyShore', 'seagrass'].includes(hab.id), open: hab.floor === false, bottom: hab.tags.includes('benthic') || ['abyssal', 'hadal', 'sandFlat', 'cave', 'deepReef'].includes(hab.id), turbid: hab.fog > .1 && hab.light < .7 && !hab.fantasy };
-  notes.push(`Ecological role here: ${ROLE_TXT[role]}${R.second !== role ? ', with ' + ROLE_TXT[R.second] + ' tendencies' : ''}.`);
-  if (H.dark > .25) {
-    if (['bottom', 'grazer', 'ribbon', 'armor'].includes(role) || tag.has('cave')) { M('head.eyeSize', 1 - .55 * H.dark); S('skin.lateralLine', 1); if (!['beak', 'tube'].includes(g.mouth.type)) { Dd('head.barbels', Math.round(2 * H.dark)); S('head.barbelLen', Math.max(g.head.barbelLen, .6)); } if (H.dark > .9 && tag.has('cave')) S('head.eyeSide', 'none'); notes.push('Little light reaches the bottom: eyes shrink while a full lateral line and barbels take over sensing.'); }
-    else if (role === 'ambush' && H.dark > .55 && !upright) { S('head.special', 'esca'); S('head.specialLen', .22 + .4 * P.pred); S('head.specialWidth', .05); S('skin.photophores', Math.max(g.skin.photophores, 10)); S('skin.glow', [185, .9, .65]); M('mouth.gape', 1.2); if (!['beak', 'tube'].includes(g.mouth.type)) { S('mouth.teeth', 'needle'); S('mouth.teethCount', Math.max(g.mouth.teethCount, 30)); } notes.push('Sit-and-wait predator in the dark: a glowing lure, a wider gape and needle teeth.'); }
-    else if (role === 'hunter' && H.dark > .45) { M('head.eyeSize', 1 + .6 * H.dark); M('mouth.gape', 1 + .35 * H.dark); if (!['beak', 'tube'].includes(g.mouth.type)) S('mouth.teeth', 'fang'); S('skin.photophores', Math.round(14 + 30 * H.dark)); S('skin.glow', [rng.range(185, 215), 1, .62]); S('skin.iridescence', 0); Lm('skin.base', .55); notes.push('Dark-water hunter: huge light-gathering eyes, fang-like teeth and a row of belly photophores.'); }
-    else if (H.dark > .35) { S('skin.photophores', Math.round(18 + 40 * H.dark * (1 - P.armor * .6))); S('skin.glow', [rng.range(185, 215), 1, .62]); M('head.eyeSize', 1 + .7 * H.dark); S('skin.countershade', .3); Lm('skin.base', .6); notes.push('Counter-illumination: belly light organs match the faint glow from above, and the eyes grow large.'); }
-    else { M('head.eyeSize', 1 + H.dark); S('skin.eye', [165, .85, .5]); M('skin.iridescence', 1 - .6 * H.dark); notes.push('Eyes enlarge and gain a reflective layer; the skin sheen is dulled.'); }
-    if (H.deep && H.dark > .6 && !upright) { S('skin.translucency', clamp(.2 + .45 * (1 - P.armor), 0, .7)); M('swim.freq', .55); M('fins.dorsal.height', .8); M('body.width', 1.15); S('skin.gloss', .8); notes.push('Food is scarce at depth: watery, low-density tissues and slow strokes save energy.'); }
-  }
-  if (H.cold) { M('body.length', 1.12); M('skin.iridescence', .6); if (['bottom', 'ambush', 'hunter'].includes(role)) { Dd('skin.translucency', .12); Lm('skin.base', 1.25); } notes.push('Cold water: a larger body, dulled sheen and paler pigment.'); }
-  if (H.flow > .3 && !upright) { M('body.fineness', 1 + .18 * H.flow); M('body.pedDepth', 1 - .2 * H.flow); M('fins.pectoral.len', 1 + .3 * H.flow); Dd('body.ventralFlat', .3 * H.flow); Dd('fins.pectoral.insertAngle', 25 * H.flow); M('swim.freq', 1 + .25 * H.flow); notes.push('Fast water: a streamlined trunk, narrow tail root and broad pectorals that pin the body to the bottom.'); }
-  if (H.cover && !upright) { M('body.fineness', .87); M('fins.pectoral.len', 1.2); M('fins.caudal.aspect', .85); if (role === 'ambush' || role === 'bottom') { S('skin.pattern', 'disruptive'); S('skin.patternStrength', Math.max(g.skin.patternStrength, .75)); S('skin.patternScale', 1.4); notes.push('Structured habitat: a deeper body, rowing fins and a broken pattern that dissolves against rock and weed.'); } else if (role === 'school') { S('skin.pattern', 'stripes'); notes.push('Structured habitat: a deeper body, rowing fins and vertical-flicker stripes for shoaling among obstacles.'); } else { if (rng.chance(.5)) S('skin.pattern', rng.pick(['bars', 'mottle', 'stripes'])); S('skin.patternStrength', Math.max(g.skin.patternStrength, .65)); notes.push('Structured habitat: a deeper, more manoeuvrable body, rowing fins and bolder markings.'); } if (hab.id === 'coralReef' || hab.id === 'deepReef') Dd('skin.iridescence', .25); }
-  if (H.open && H.dark < .5 && !upright) { M('body.fineness', 1.12); S('skin.countershade', .85); Dd('skin.iridescence', .25); M('fins.caudal.aspect', 1.15); M('fins.dorsal.height', .88); notes.push('Open water: a sleeker body, silvered counter-shaded skin and a higher-aspect tail.'); }
-  if (H.bottom && !upright) { Dd('body.ventralFlat', .3); Dd('head.eyeV', .18); if (H.deep) M('fins.pelvic.len', 1.5); notes.push('Bottom-hugging form: flattened belly and upward-set eyes' + (H.deep ? ', pelvic fins lengthened into stilts.' : '.')); }
-  if (H.turbid && H.dark < .6) { if (['bottom', 'grazer', 'armor'].includes(role) && !['beak', 'tube'].includes(g.mouth.type)) { Dd('head.barbels', 2); S('head.barbelLen', Math.max(g.head.barbelLen, .45)); } S('skin.lateralLine', 1); M('head.eyeSize', .9); if (['school', 'display', 'generalist', 'hunter'].includes(role) && !upright) { S('mouth.type', 'superior'); Dd('body.dorsalFlat', .25); notes.push('Murky surface water: an upturned mouth for the surface film and an enhanced lateral line.'); } else notes.push('Murky water: touch-sensing barbels and a full lateral line replace sight.'); }
-  const FX = {
-    lavaLake: () => { S('skin.scale', 'plates'); S('skin.photophores', 26); S('skin.glow', [25, 1, .55]); if (g.fins.dorsal.present) S('fins.dorsal.shape', 'spines'); S('skin.base', [10, .3, .08]); S('skin.belly', [18, .9, .45]); return 'Ember form: heat-proof plates, a glowing belly and a spined crest.'; },
-    skySea: () => { if (!upright) { S('fins.pectoral.shape', 'wing'); S('fins.pectoral.len', Math.max(g.fins.pectoral.len, 1.9)); S('fins.pectoral.insertAngle', 10); } S('skin.translucency', .6); S('skin.iridescence', 1); return 'Sky form: wing-like pectorals, translucent skin and a rainbow sheen.'; },
-    crystalCavern: () => { S('skin.scale', 'plates'); S('skin.translucency', .75); S('skin.gloss', 1); S('skin.iridescence', 1); S('skin.photophores', 10); S('skin.glow', [285, .8, .7]); return 'Crystal form: faceted translucent plates that refract glow.'; },
-    void: () => { M('head.eyeSize', 1.6); S('skin.photophores', 60); S('skin.glow', [275, 1, .7]); S('skin.base', [265, .3, .04]); S('skin.belly', [265, .3, .08]); if (!['beak', 'tube'].includes(g.mouth.type)) { S('head.barbels', 4); S('head.barbelLen', 1.2); } return 'Void form: huge eyes, near-black skin, a star-field of lights and long sensory barbels.'; }
+      show(); if (TEST_STATE.cancel) break;
+    }
+    if (!TEST_STATE.cancel) {
+      const row = { name: 'All reference species', n: 0, m: 0, geo: 0, hero: 0, lod: 0, fail: 0 }; rows.push(row);
+      for (const sp of SPECIES) {
+        if (TEST_STATE.cancel) break;
+        const g = generate({ species: sp.id, seed: 'reference-anatomy' }); testGenome(g, row, true);
+        const a = anatomyProfile(g), locks = a.locks;
+        if (Object.keys(locks).some(p => getP(g, p) !== locks[p])) { row.fail++; issues.push(sp.n + ': lineage architecture failed'); }
+        const again = generate({ species: sp.id, seed: 'reference-anatomy' });
+        if (JSON.stringify(stripGenome(g)) !== JSON.stringify(stripGenome(again))) { row.fail++; issues.push(sp.n + ': generation is not deterministic'); }
+        const mutant = mutate(g, .7, 'breed-' + sp.id), offspring = breed(g, mutant, 'cross-' + sp.id); row.m++;
+        if (violations(offspring).length) { row.fail++; issues.push(sp.n + ': crossover rules failed'); }
+        prog.textContent = 'Reference anatomy: ' + sp.n; show(); await yieldFrame();
+      }
+    }
+    const failed = rows.reduce((n, r) => n + r.fail, 0); TEST_STATE.last = { rows, issues, exhaustive, canceled: TEST_STATE.cancel };
+    prog.textContent = TEST_STATE.cancel ? 'Canceled. Partial results shown.' : failed ? `${failed} checks failed. Details below.` : 'All completed checks passed.';
+  } finally { TEST_STATE.running = App.testing = false; App.paused = beforePause; }
+  return TEST_STATE.last;
+}
+FG.checkFishGeometry = checkFishGeometry; FG.TEST_STATE = TEST_STATE;
+/* close-up / test hook: scripted cameras, rest pose and held jaw (used by the render check) */
+FG.shoot = { App, setCameraView, look(pos, tgt) { camera.position.set(pos[0], pos[1], pos[2]); controls.target.set(tgt[0], tgt[1], tgt[2]); controls.update(); }, get controls() { return controls; }, rest(on) { window.__fgRest = !!on; }, jaw(v) { window.__fgJaw = v; }, fin(v) { window.__fgFin = v || null; }, get scene() { return scene; }, get camera() { return camera; }, bg(c) { scene.background = new THREE.Color(c); scene.fog = null; }, hide(names) { App.fish.group.traverse(o => { if (o.userData && o.userData.layer && names.includes(o.userData.layer)) o.visible = false; }); } };
+/* ── events & boot ── */
+/* ╔══════════════════════════════════════════════════════════════════╗
+   ║ 9. HYBRID + EVOLUTION ENGINE                                     ║
+   ║    body-plan aware crossing, habitat syndromes, wonder search,   ║
+   ║    gradual evolution (drift · selection · gene flow · novelty)   ║
+   ╚══════════════════════════════════════════════════════════════════╝ */
+const mixC = (a, b, t) => { const dh = ((b[0] - a[0] + 540) % 360) - 180; return [(a[0] + dh * t + 360) % 360, clamp(lerp(a[1], b[1], t), 0, 1), clamp(lerp(a[2], b[2], t), 0, 1)]; };
+const nounOf = n => String(n || 'fish').replace(/\(.*?\)/g, '').trim().split(/\s+/).pop().toLowerCase().replace(/[^a-z-]/g, '') || 'fish';
+const LOGP = new Set(['body.length', 'body.fineness', 'body.width', 'body.pedDepth', 'body.snoutDepth', 'head.lengthFrac', 'head.eyeSize', 'mouth.gape', 'swim.freq', 'fins.dorsal.height', 'fins.dorsal2.height', 'fins.dorsal3.height', 'fins.anal.height', 'fins.pectoral.len', 'fins.pelvic.len', 'fins.caudal.len', 'fins.caudal.span', 'fins.caudal.aspect', 'fins.adipose.size', 'head.specialLen', 'head.specialWidth', 'head.barbelLen']);
+const blendN = (p, a, b, t) => LOGP.has(p) && a > 0 && b > 0 ? Math.exp(lerp(Math.log(a), Math.log(b), t)) : lerp(a, b, t);
+const setN = (g, p, v) => { const e = SCHEMA[p]; v = clamp(v, e.min, e.max); setP(g, p, e.t === 'i' ? Math.round(v) : v); };
+const cp3 = v => Array.isArray(v) ? v.slice() : v;
+/* every schema path belongs to exactly one organ; organs are inherited as functional units */
+const ORGAN_DEFS = [
+  ['body', 'struct', p => p.startsWith('body.')], ['face', 'surface', p => /^head\.(lengthFrac|snoutTaper|foreheadSlope|brow|cheek)$/.test(p)],
+  ['jaw', 'surface', p => p.startsWith('mouth.')], ['eye', 'surface', p => /^head\.eye/.test(p) || p === 'skin.eye'],
+  ['ornament', 'surface', p => /^head\.special/.test(p)], ['barbels', 'surface', p => /^head\.barbel/.test(p)],
+  ['gills', 'lineage', p => /^head\.(operculum|gill|spiracles|nostrils)/.test(p)],
+  ['dorsal', 'struct', p => /^fins\.dorsal/.test(p)], ['anal', 'struct', p => /^fins\.anal\./.test(p)], ['pectoral', 'struct', p => /^fins\.pectoral\./.test(p)],
+  ['pelvic', 'struct', p => /^fins\.pelvic\./.test(p)], ['tail', 'struct', p => /^fins\.caudal\./.test(p) || p.startsWith('swim.')],
+  ['extras', 'surface', p => /^fins\.(adipose|finlets)/.test(p)], ['scales', 'surface', p => p === 'skin.scale' || p === 'skin.scaleSize'],
+  ['pattern', 'surface', p => /^skin\.(pattern|band)/.test(p)], ['palette', 'surface', p => ['skin.base', 'skin.belly', 'skin.accent', 'skin.fin'].includes(p)],
+  ['sheen', 'surface', p => /^skin\.(iridescence|gloss|countershade|lateralLine)$/.test(p)], ['light', 'surface', p => /^skin\.(photophores|glow|translucency|electric|inflate)$/.test(p)]
+];
+const ORGAN_KIND = {}, ORG_OF = {}, ORG_PATHS = {}, ORGAN_LABEL = { body: 'Body plan', face: 'Head shape', jaw: 'Jaws & teeth', eye: 'Eyes', ornament: 'Head ornament', barbels: 'Barbels', gills: 'Gills', dorsal: 'Dorsal fins', anal: 'Anal fin', pectoral: 'Pectoral fins', pelvic: 'Pelvic fins', tail: 'Tail & swimming', extras: 'Finlets & adipose', scales: 'Scales', pattern: 'Pattern', palette: 'Palette', sheen: 'Sheen & lateral line', light: 'Light organs & skin' };
+for (const [id, kind] of ORGAN_DEFS) ORGAN_KIND[id] = kind;
+for (const p in SCHEMA) { const d = ORGAN_DEFS.find(x => x[2](p)); ORG_OF[p] = d ? d[0] : '?'; (ORG_PATHS[ORG_OF[p]] = ORG_PATHS[ORG_OF[p]] || []).push(p); }
+let _GEN = null; const generic = () => _GEN || (_GEN = defaultGenome());
+/** how far an organ departs from a generic fish (0..1): the organ's "signature" */
+function signature(g, id) {
+  let s = 0, n = 0; const d0 = generic();
+  for (const p of ORG_PATHS[id] || []) { const e = SCHEMA[p], v = getP(g, p), d = getP(d0, p); n++;
+    if (e.t === 'n' || e.t === 'i') s += Math.min(1, Math.abs(v - d) / Math.max(1e-6, e.max - e.min) * 3);
+    else if (e.t === 'hsl') s += Math.min(1, Math.abs(((v[0] - d[0] + 540) % 360) - 180) / 180 * .6 + Math.abs(v[1] - d[1]) * .5 + Math.abs(v[2] - d[2]) * .5);
+    else s += v !== d ? 1 : 0; }
+  return n ? s / n : 0;
+}
+/** body-plan class: structural organs are only exchanged between identical plans (names follow the real anatomy families) */
+function planOf(g) {
+  const fam = anatomyProfile(g).family, b = g.body;
+  if (fam === 'upright' || b.posture > 60) return 'upright';
+  if (fam === 'ray') return 'ray'; if (fam === 'benthicShark') return 'flatShark'; if (fam === 'flatfish' || Math.abs(b.roll) > 45) return 'flat';
+  if (fam === 'knife') return 'knife'; if (fam === 'molid') return 'molid'; if (fam === 'rigid') return 'rigid'; if (fam === 'jawless') return 'jawless'; if (fam === 'pipe') return 'pipe';
+  if (fam === 'ribbon' && b.fineness > 8) return 'ribbon'; if (fam === 'chimaera') return 'chimaera';
+  return 'std';
+}
+const shuffle = (rng, a) => { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(rng.next() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+/** functional axes (0..1) measured from the genome itself, so every rule reacts to the real fish, invented or not */
+const AX = g => {
+  const f = g.fins, s = g.skin, m = g.mouth, b = g.body, pierce = ['fang', 'needle', 'triangular'].includes(m.teeth);
+  return {
+    fast: clamp((b.fineness - 3) / 6, 0, 1) * (f.caudal.present && f.caudal.aspect > 2.6 ? 1 : .55), agile: clamp(f.pectoral.len / 1.1, 0, 1) * (b.fineness < 4.5 ? 1 : .5),
+    pred: clamp(m.gape * .8 + (pierce ? .35 : 0), 0, 1), flat: clamp(b.ventralFlat * .8 + (g.head.eyeV > .7 ? .25 : 0) + (Math.abs(b.roll) > 45 ? .6 : 0), 0, 1),
+    armor: ['plates', 'scutes', 'ganoid'].includes(s.scale) ? 1 : s.scale === 'denticle' ? .45 : 0,
+    camo: ['mottle', 'disruptive', 'saddles', 'spots'].includes(s.pattern) ? clamp(s.patternStrength * (1 - s.iridescence * .5), 0, 1) : 0,
+    show: clamp((f.dorsal.height + f.pectoral.len * .5) / 1.6, 0, 1) * (.4 + s.iridescence * .6), dark: clamp(s.photophores / 30, 0, 1), eel: clamp((b.fineness - 7) / 6, 0, 1),
+    size: clamp(Math.log10(b.length / .05) / 2.6, 0, 1), glass: s.translucency,
+    filter: m.gape > .68 && ['none', 'rasp'].includes(m.teeth) ? clamp((m.gape - .6) / .3, 0, 1) : 0,
+    grazer: m.gape < .3 && ['molar', 'beak', 'villiform', 'rasp'].includes(m.teeth) ? clamp((.34 - m.gape) / .2, 0, 1) : 0,
+    surface: (m.type === 'superior' ? .6 : 0) + b.dorsalFlat * .4, spiny: f.dorsal.shape === 'spines' || f.dorsal.spines >= 14 ? 1 : 0,
+    school: clamp((s.iridescence - .45) * 2, 0, 1) * (b.length < .5 ? 1 : .4), sail: f.dorsal.shape === 'sail' || f.dorsal.height > 1.1 ? 1 : 0, whisker: clamp(g.head.barbels / 4, 0, 1)
   };
-  if (FX[hab.id]) notes.push(FX[hab.id]());
-  if (['cave', 'mountainStream', 'rockyShore', 'coralReef', 'seagrass'].includes(hab.id) && g.body.length > .9) { M('body.length', .6); notes.push('A small, structured habitat caps body size.'); } else if (hab.id === 'openOcean' && g.body.length < .4) M('body.length', 1.25);
-  /* palette: functional colour (camouflage) is pulled strongly toward the habitat; reef colour hardly at all */
-  const k = clamp((PAL_PULL[hab.id] || .4) * (.6 + .5 * (P.camo + H.dark * .5)), .1, .9), hr = rng.pick(hab.pal.h), th = rng.range(hr[0], hr[1]), tl = (hab.pal.l[0] + hab.pal.l[1]) / 2, ts = (hab.pal.s[0] + hab.pal.s[1]) / 2;
-  for (const [p, w] of [['skin.base', 1], ['skin.accent', .6], ['skin.fin', .75], ['skin.belly', .5]]) { keep(p); const c2 = getP(g, p).slice(), dh = ((th - c2[0] + 540) % 360) - 180; c2[0] = (c2[0] + dh * k * w + 360) % 360; c2[1] = clamp(lerp(c2[1], Math.min(c2[1], ts * 1.35 + .1), k * .6 * w), 0, 1); if (p !== 'skin.belly') c2[2] = clamp(lerp(c2[2], tl, (.3 * H.dark + .1) * k), .03, .95); setP(g, p, c2); }
-  const ba = g.skin.base, ac = g.skin.accent; if (Math.abs(ac[2] - ba[2]) < .14) S('skin.accent', [ac[0], ac[1], clamp(ba[2] + (ba[2] > .45 ? -.28 : .28), .05, .95)]);
-  notes.push(`Colour is pulled ${Math.round(k * 100)}% toward the ${hab.n.toLowerCase()} palette.`);
-  g.meta.adapted = { from: (g.meta.adapted && g.meta.adapted.from) || g.meta.habitat, to: hab.id, speculative: false }; g.meta.habitat = hab.id;
-  return { notes, touched };
-}
-function nameHybrid(c, hab) { if (!c.meta.hybrid) return; const h = c.meta.hybrid, ad = HAB_ADJ[hab.id] || hab.n.toLowerCase(); c.meta.name = (ad.charAt(0).toUpperCase() + ad.slice(1) + ' ' + (h.nouns || [h.na, h.nb]).join('-')).trim(); c.meta.sci = 'Chimaerichthys ' + h.na.slice(0, 4) + h.nb.slice(0, 4) + 'ensis (hybrid concept)'; }
-// @@PART js/app.part17.js (17/19) lines 3391-3568 of the original module script -- stripped by build.mjs
-/** Adapt an unfinalised genome to a habitat, repair, audit and name it (retries with fresh draws if anything is unsound). */
-function adaptFinish(pre, habId, seed) {
-  const hab = HABITATS[habId]; let c;
-  for (let i = 0; i < 4; i++) {
-    c = deepClone(pre); c.meta.repairs = []; const r2 = new RNG('adapt:' + seed + habId + i);
-    c.meta.adapted = { from: pre.meta.adapted ? pre.meta.adapted.from : pre.meta.habitat, to: habId, speculative: false }; c.meta.habitat = habId; finalize(c, r2);
-    const res = adaptHab(c, hab, r2); c.meta.notes = res.notes; c.meta.adaptBase = res.touched; c.meta.repairs = []; finalize(c, r2);
-    if (c.meta.hybrid) c.meta.hybrid.syn = c.meta.hybrid.syn.filter(s => !SYN[s.id] || SYN[s.id][3](c));
-    if (!violations(c).length && !structuralAudit(c).length) break;
-    if (i === 2) { pre = deepClone(pre); pre.head.special = 'none'; pre.head.specialLen = SCHEMA['head.specialLen'].def; }
+};
+/* ── plan-coherence rules: these remove the "missing tail" class of defects everywhere (mix, mutate, god mode) ── */
+RULE('plan_swim_posture', 'Swim mode, posture and curl agree with the body plan', (g, lm, log) => {
+  const a = anatomyProfile(g), lockNoTail = a.locks && a.locks['fins.caudal.present'] === false;
+  if (g.swim.mode === 'hippocampiform' && g.body.posture <= 60 && !lockNoTail) setLog(g, log, 'plan_swim_posture', 'swim.mode', g.body.fineness > 9 ? 'anguilliform' : 'subcarangiform');
+  if (g.swim.mode === 'rajiform' && a.family !== 'ray') setLog(g, log, 'plan_swim_posture', 'swim.mode', 'subcarangiform');
+  if (g.body.curl > .02 && g.body.posture <= 60 && a.family !== 'upright') setLog(g, log, 'plan_swim_posture', 'body.curl', 0);
+});
+// @@PART js/app.part16.js (16/19) lines 3228-3390 of the original module script -- stripped by build.mjs
+RULE('tail_presence', 'A caudal fin exists unless the lineage truly lacks one', (g, lm, log) => {
+  const c = g.fins.caudal, a = anatomyProfile(g), plan = planOf(g);
+  const may = (a.locks && a.locks['fins.caudal.present'] === false) || ['upright', 'ray', 'knife', 'flatShark'].includes(plan) || !!(g.meta.clade && ['batoid'].some(id => cladePath(g.meta.clade).some(n => n.id === id)));
+  if (c.present || may) return;
+  setLog(g, log, 'tail_presence', 'fins.caudal.present', true);
+  const type = (SWIM_TAILS[g.swim.mode] || CAUDAL_TYPES).find(t => !['filamentous', 'diphycercal'].includes(t)) || 'rounded', ar = CAUDAL_AR[type];
+  setLog(g, log, 'tail_presence', 'fins.caudal.type', type); setLog(g, log, 'tail_presence', 'fins.caudal.aspect', +((ar[0] + ar[1]) / 2).toFixed(2));
+  setLog(g, log, 'tail_presence', 'fins.caudal.len', .17); setLog(g, log, 'tail_presence', 'fins.caudal.span', +clamp(g.body.pedDepth * 2.4, .85, 1.5).toFixed(2));
+  setLog(g, log, 'tail_presence', 'fins.caudal.lobeAsym', 0); setLog(g, log, 'tail_presence', 'fins.caudal.opacity', .85);
+});
+RULE('tail_visibility', 'The caudal fin flares clearly beyond the peduncle and is never a stub', (g, lm, log) => {
+  const c = g.fins.caudal; if (!c.present) return; const a = anatomyProfile(g), molid = a.family === 'molid';
+  const need = Math.max(.5, g.body.pedDepth * (molid ? 1.15 : 1.65)), cap = a.tailSpan[1];
+  if (c.span < need) { if (need <= cap) setLog(g, log, 'tail_visibility', 'fins.caudal.span', +need.toFixed(3)); else { setLog(g, log, 'tail_visibility', 'fins.caudal.span', cap); clampLog(g, log, 'tail_visibility', 'body.pedDepth', .03, Math.max(.03, cap / (molid ? 1.15 : 1.65))); } }
+});
+RULE('fin_scale_cap', 'No fin is longer than ~90% of the body (guards crossed and evolved genomes)', (g, lm, log) => {
+  const a = anatomyProfile(g), b = g.body, f = g.fins; if (['ray', 'benthicShark', 'glider', 'lion', 'molid'].includes(a.family)) return;
+  if (f.pectoral.present) clampLog(g, log, 'fin_scale_cap', 'fins.pectoral.len', .05, Math.max(.2, .86 * b.fineness));
+  if (f.dorsal.present) clampLog(g, log, 'fin_scale_cap', 'fins.dorsal.height', .03, Math.max(.3, .9 * b.fineness));
+  if (f.anal.present) clampLog(g, log, 'fin_scale_cap', 'fins.anal.height', .03, Math.max(.3, .8 * b.fineness));
+});
+/** analytic structural audit used to gate every generated fish (returns a list of issues, empty = sound) */
+function structuralAudit(g) {
+  const out = [], a = anatomyProfile(g), plan = planOf(g), c = g.fins.caudal, f = g.fins, b = g.body;
+  const noTailOk = (a.locks && a.locks['fins.caudal.present'] === false) || ['upright', 'ray', 'knife', 'flatShark'].includes(plan);
+  if (!c.present && !noTailOk) out.push('tail: no caudal fin on a swimming body plan');
+  if (c.present) {
+    if (g.swim.mode === 'hippocampiform') out.push('tail: hippocampiform swimmer with a caudal fin');
+    if (!(SWIM_TAILS[g.swim.mode] || CAUDAL_TYPES).includes(c.type)) out.push('tail: caudal type does not match swim mode');
+    if (c.span < Math.max(.45, b.pedDepth * (a.family === 'molid' ? 1.1 : 1.5))) out.push('tail: fin does not flare beyond the peduncle');
   }
-  nameHybrid(c, hab); return c;
-}
-/** Re-adapt to another habitat from the pre-adaptation state, so habitat changes never compound. */
-function rehabitat(g, habId) {
-  const pre = deepClone(g), base = g.meta.adaptBase; if (base) for (const p in base) if (SCHEMA[p]) setP(pre, p, cp3(base[p]));
-  return adaptFinish(pre, habId, Math.random().toString(36).slice(2, 8));
-}
-function parentFrom(val, habId, seed) {
-  const [k, id] = val.split(':');
-  if (k === 'sp') { const s = SPECIES.find(x => x.id === id); return generate({ species: id, habitat: s.habitat, seed, noAdapt: true }); }
-  if (k === 'ni') { let best = null, bw = 0; for (const h in HABITATS) { const w = HABITATS[h].niches[id] || 0; if (w > bw) { bw = w; best = h; } } return generate({ niche: id, habitat: best || habId, noSpecies: true, seed }); }
-  return invent(habId, seed);
+  if (b.posture > 60 && g.swim.mode !== 'hippocampiform') out.push('plan: upright posture without hippocampiform swimming');
+  if (g.swim.mode === 'hippocampiform' && !c.present && plan !== 'upright') out.push('tail: hippocampiform swimmer on a non-upright body plan');
+  if (b.curl > .05 && b.posture <= 60 && a.family !== 'upright') out.push('plan: curled tail on a non-upright body');
+  if (!['ray', 'flatShark', 'molid'].includes(plan) && !['glider', 'lion'].includes(a.family)) {
+    if (f.dorsal.present && f.dorsal.height / b.fineness > .95) out.push('fin: dorsal fin taller than 95% of body length');
+    if (f.pectoral.present && f.pectoral.len / b.fineness > .9) out.push('fin: pectoral fin longer than 90% of body length');
+    if (f.anal.present && f.anal.height / b.fineness > .85) out.push('fin: anal fin taller than 85% of body length');
+  }
+  if (b.fineness < 1.3 || b.fineness > 17.1) out.push('body: fineness out of range');
+  return out;
 }
 
-/* ── phenotype distance: every evolutionary event must change something visible ── */
-function phenoDelta(a, b) {
-  let s = 0;
-  for (const p in SCHEMA) {
-    const e = SCHEMA[p], x = getP(a, p), y = getP(b, p);
-    if (e.t === 'n' || e.t === 'i') s += (/^(fins|body|head|mouth)\./.test(p) ? 1 : .6) * Math.min(.5, Math.abs(x - y) / Math.max(1e-6, e.max - e.min));
-    else if (e.t === 'hsl') s += .5 * Math.abs(((x[0] - y[0] + 540) % 360) - 180) / 180 + .25 * Math.abs(x[1] - y[1]) + .25 * Math.abs(x[2] - y[2]);
-    else if (x !== y) s += .12;
-  }
-  return s;
-}
-const mx = (g, p, v) => setN(g, p, Math.max(getP(g, p), v)), mn = (g, p, v) => setN(g, p, Math.min(getP(g, p), v));
-const NOSNOUT = g => ['beak', 'tube'].includes(g.mouth.type), STDLIKE = X => ['std', 'flat', 'ribbon', 'pipe', 'chimaera', 'rigid'].includes(X.plan);
-/** Key innovations: each develops through stages (bud → working organ → elaborated), only where the fish's ecology and body plan allow it. */
-const NOVELTIES = [
-  { id: 'lure', n: 'Glowing lure', st: ['a fleshy bud sprouts on the snout', 'the bud lengthens into a flexible rod', 'the rod ends in a luminous bulb'], can: (g, X) => !['esca', 'bill', 'sword', 'hammer'].includes(g.head.special) && STDLIKE(X) && (X.role === 'ambush' || X.role === 'bottom' || X.dark > .3), w: (g, X) => .6 + (X.role === 'ambush' ? 2.2 : 0) + X.dark * 2, ap: (g, s, r, X) => { g.head.special = 'esca'; setN(g, 'head.specialLen', [.1, .24, .4][s - 1]); setN(g, 'head.specialWidth', [.03, .042, .055][s - 1]); if (s >= 2 && X.dark > .12) { mx(g, 'skin.photophores', s * 7); g.skin.glow = [r.range(170, 200), .9, .65]; } if (s === 3) mx(g, 'mouth.gape', .55); } },
-  { id: 'barbels', n: 'Sensory barbels', st: ['two short taste-buds appear at the lip', 'the barbels lengthen', 'a full whisker set senses prey by touch'], can: (g, X) => !NOSNOUT(g) && STDLIKE(X) && g.head.barbels < 4 && (['bottom', 'grazer', 'ambush', 'ribbon'].includes(X.role) || X.dark > .3 || X.turbid), w: (g, X) => .8 + (X.role === 'bottom' ? 1.6 : 0) + X.dark * 1.5, ap: (g, s) => { mx(g, 'head.barbels', [2, 2, 4][s - 1]); mx(g, 'head.barbelLen', [.3, .55, .85][s - 1]); if (s === 3) g.skin.lateralLine = 1; } },
-  { id: 'photo', n: 'Light organs', st: ['a few light organs dot the belly', 'rows of photophores form along the flanks', 'a dense constellation of lights covers the body'], can: (g, X) => (X.dark > .25 || X.fantasy) && g.skin.photophores < 50, w: (g, X) => .6 + X.dark * 2.6, ap: (g, s, r) => { mx(g, 'skin.photophores', [8, 22, 44][s - 1]); if (s === 1) g.skin.glow = [r.range(170, 215), .95, .62]; if (s === 3) mn(g, 'skin.gloss', 1); } },
-  { id: 'armor', n: 'Bony armour', st: ['scales thicken and gloss over', 'ridged scutes run along the keel', 'interlocking armour plates cover the flanks'], can: (g, X) => STDLIKE(X) && g.skin.scale !== 'plates' && X.plan !== 'ribbon', w: (g, X) => .5 + (X.role === 'armor' ? 2 : 0) + (X.role === 'bottom' ? 1 : 0) - X.P.fast * .3, ap: (g, s) => { if (s === 1) { setN(g, 'skin.scaleSize', g.skin.scaleSize * 1.25); mx(g, 'skin.gloss', .55); } if (s === 2) { g.skin.scale = 'scutes'; mx(g, 'body.keel', .7); } if (s === 3) { g.skin.scale = 'plates'; setN(g, 'skin.scaleSize', Math.max(1.8, g.skin.scaleSize)); for (const k of ['dorsal', 'anal', 'pectoral', 'caudal']) g.fins[k].flex = Math.min(g.fins[k].flex, .35); } } },
-  { id: 'sail', n: 'Sail fin', st: ['the dorsal fin lifts and sweeps back', 'the fin extends into a tall crest', 'a full display sail fans open'], can: (g, X) => STDLIKE(X) && g.fins.dorsal.present && g.fins.dorsal.shape !== 'sail' && g.fins.dorsal.height < 1.3, w: (g, X) => .6 + X.P.show * 1.5 + (X.role === 'display' ? 1.5 : 0), ap: (g, s, r) => { if (s === 1) { g.fins.dorsal.shape = g.fins.dorsal.shape === 'spines' ? 'spines' : 'falcate'; setN(g, 'fins.dorsal.height', g.fins.dorsal.height * 1.3); } if (s === 2) setN(g, 'fins.dorsal.height', Math.max(g.fins.dorsal.height * 1.25, .8)); if (s === 3) { g.fins.dorsal.shape = 'sail'; mx(g, 'fins.dorsal.height', 1); g.fins.dorsal.u0 = Math.min(g.fins.dorsal.u0, .18); g.fins.dorsal.u1 = Math.max(g.fins.dorsal.u1, .6); g.skin.fin = [(g.skin.base[0] + r.range(120, 200)) % 360, .75, .5]; } } },
-  { id: 'streamers', n: 'Trailing streamers', st: ['the pelvic fins lengthen', 'pelvic fins draw out into filaments', 'filaments trail from pelvic and dorsal fins'], can: (g, X) => STDLIKE(X) && g.fins.pelvic.present && g.fins.pelvic.shape !== 'filament', w: (g, X) => .6 + X.P.show, ap: (g, s) => { setN(g, 'fins.pelvic.len', g.fins.pelvic.len * (s === 1 ? 1.5 : 1.2)); if (s >= 2) g.fins.pelvic.shape = 'filament'; if (s === 3 && g.fins.dorsal.present && g.fins.dorsal.shape !== 'sail') { g.fins.dorsal.shape = 'filament'; setN(g, 'fins.dorsal.height', g.fins.dorsal.height * 1.25); } } },
-  { id: 'veil', n: 'Veil tail', st: ['the tail broadens', 'the tail flows into long, soft lobes', 'a full veil-tail with floating margins'], can: (g, X) => STDLIKE(X) && g.fins.caudal.present && g.fins.caudal.type !== 'fantail' && X.P.fast < .55 && X.plan !== 'ribbon' && X.plan !== 'rigid', w: (g, X) => .5 + (1 - X.P.fast) + (X.role === 'display' ? 1.4 : 0), ap: (g, s) => { setN(g, 'fins.caudal.span', g.fins.caudal.span * [1.12, 1.18, 1.15][s - 1]); if (s >= 2) { g.swim.mode = 'subcarangiform'; g.fins.caudal.type = 'fantail'; g.fins.caudal.flex = Math.max(g.fins.caudal.flex, .8); g.fins.caudal.opacity = Math.min(g.fins.caudal.opacity, .75); } if (s === 3) setN(g, 'fins.caudal.len', Math.max(g.fins.caudal.len, .34)); } },
-  { id: 'spines', n: 'Venomous spines', st: ['dorsal rays harden into spines', 'the spines lengthen and spread', 'a crown of warning-coloured spines'], can: (g, X) => STDLIKE(X) && g.fins.dorsal.present && !(g.fins.dorsal.shape === 'spines' && g.fins.dorsal.spines >= 12), w: (g, X) => .6 + (X.role === 'bottom' ? 1.2 : 0) + (X.role === 'ambush' ? 1 : 0), ap: (g, s, r) => { mx(g, 'fins.dorsal.spines', [6, 9, 13][s - 1]); if (s >= 2) g.fins.dorsal.shape = 'spines'; if (s === 3) g.skin.accent = [r.pick([6, 28, 46]), .9, .52]; } },
-  { id: 'warn', n: 'Warning bands', st: ['a pale band appears across the flank', 'the band hardens into bold contrast', 'bold warning bars advertise danger'], can: (g, X) => g.skin.band < .75 && g.skin.pattern !== 'bars', w: (g, X) => .6 + (X.hab.id === 'coralReef' ? 1.4 : 0) + (X.P.spiny ? 1.6 : 0), ap: (g, s, r) => { setN(g, 'skin.band', [.4, .6, .8][s - 1]); g.skin.bandColor = [(g.skin.base[0] + r.range(150, 210)) % 360, .8, .55]; if (s === 3) { g.skin.pattern = 'bars'; mx(g, 'skin.patternStrength', .75); } } },
-  { id: 'silver', n: 'Mirror skin', st: ['the flanks begin to silver', 'a counter-shaded mirror sheen forms', 'mirror-bright flanks blink as it turns'], can: (g, X) => g.skin.iridescence < .9 && X.dark < .6, w: (g, X) => .5 + (X.role === 'school' ? 2 : 0) + (X.hab.floor === false ? 1.2 : 0), ap: (g, s) => { mx(g, 'skin.iridescence', [.45, .7, .95][s - 1]); mx(g, 'skin.countershade', [.5, .75, .9][s - 1]); } },
-  { id: 'eyes', n: 'Night vision', st: ['the eyes enlarge and warm in colour', 'the eyes grow a reflective layer', 'huge, forward-set tapetum eyes gather every photon'], can: (g, X) => g.head.eyeSide !== 'none' && X.dark > .15 && g.head.eyeSize < .45, w: (g, X) => .5 + X.dark * 2.2, ap: (g, s) => { setN(g, 'head.eyeSize', g.head.eyeSize * [1.15, 1.12, 1.15][s - 1]); g.skin.eye = [[150, .6, .46], [165, .85, .5], [178, .95, .58]][s - 1]; if (s === 3) setN(g, 'head.eyeForward', g.head.eyeForward + .08); } },
-  { id: 'periscope', n: 'Periscope eyes', st: ['the eyes shift upward on the skull', 'the eyes ride higher on bony brows', 'periscope eyes watch from the waterline'], can: (g, X) => g.head.eyeSide !== 'none' && STDLIKE(X) && g.head.eyeV < .8 && (X.role === 'bottom' || X.role === 'ambush' || X.P.surface > .3), w: (g, X) => .4 + (X.role === 'bottom' ? 1.5 : 0) + X.P.surface * 2, ap: (g, s) => { mx(g, 'head.eyeV', [.5, .68, .85][s - 1]); if (s >= 2) mx(g, 'head.brow', .5); } },
-  { id: 'fangs', n: 'Piercing teeth', st: ['the teeth sharpen', 'long needle teeth line the jaws', 'fangs and a wider gape for gripping prey'], can: (g, X) => !NOSNOUT(g) && g.mouth.teeth !== 'fang' && STDLIKE(X) && X.role !== 'filter' && X.role !== 'grazer', w: (g, X) => .5 + X.P.pred * 2, ap: (g, s) => { g.mouth.teeth = ['villiform', 'needle', 'fang'][s - 1]; mx(g, 'mouth.teethCount', [30, 26, 16][s - 1]); setN(g, 'mouth.gape', g.mouth.gape * 1.08); } },
-  { id: 'crushers', n: 'Crushing jaws', st: ['the teeth blunt into pavement', 'a stout jaw bears molar plates', 'a powerful beak-like crushing mouth'], can: (g, X) => !NOSNOUT(g) && STDLIKE(X) && !['molar', 'beak'].includes(g.mouth.teeth) && (X.role === 'grazer' || X.role === 'armor' || X.role === 'bottom'), w: (g, X) => .4 + X.P.grazer * 2 + X.P.armor, ap: (g, s) => { g.mouth.teeth = s === 1 ? 'villiform' : 'molar'; if (s === 3) setN(g, 'head.cheek', Math.max(g.head.cheek, .6)); setN(g, 'mouth.gape', g.mouth.gape * .9); mx(g, 'mouth.teethCount', 14); } },
-  { id: 'electric', n: 'Electric organ', st: ['muscle tissue begins to hum with charge', 'an electric organ lights the flanks', 'a strong electric discharge organ'], can: (g, X) => !g.skin.electric && (['ribbon', 'knife', 'std'].includes(X.plan)) && (X.turbid || X.dark > .25 || X.hab.id === 'blackwater' || X.hab.id === 'floodplain'), w: (g, X) => .4 + (X.plan === 'ribbon' || X.plan === 'knife' ? 1.8 : 0) + X.dark, ap: (g, s) => { if (s >= 2) g.skin.electric = true; if (s === 3) { g.skin.glow = [200, .8, .62]; mx(g, 'skin.photophores', 6); } } },
-  { id: 'inflate', n: 'Defensive inflation', st: ['the belly stretches', 'the skin hardens into prickles', 'it can balloon into a spiny sphere'], can: (g, X) => !g.skin.inflate && ['std', 'rigid'].includes(X.plan) && g.body.fineness < 5, w: () => .5, ap: (g, s) => { if (s === 1) setN(g, 'body.width', Math.min(.8, g.body.width * 1.15)); if (s === 2) { g.skin.scale = 'denticle'; setN(g, 'body.width', Math.min(.85, g.body.width * 1.1)); } if (s === 3) { g.skin.inflate = true; mx(g, 'fins.dorsal.spines', 4); } } },
-  { id: 'glass', n: 'Glass tissue', st: ['pigment thins out', 'the body turns half-transparent', 'near-invisible glass body'], can: (g, X) => g.skin.translucency < .6 && STDLIKE(X) && (X.dark > .2 || X.hab.floor === false), w: (g, X) => .4 + X.dark * 1.5 + (X.hab.floor === false ? .8 : 0), ap: (g, s) => { mx(g, 'skin.translucency', [.25, .45, .68][s - 1]); g.skin.belly[2] = Math.max(g.skin.belly[2], .86); } },
-  { id: 'finlets', n: 'Speed finlets', st: ['small finlets bud behind the dorsal', 'a row of finlets forms', 'keeled finlets and a scute-ridged tail root'], can: (g, X) => g.fins.finlets.count < 5 && X.plan === 'std' && X.P.fast > .3 && g.fins.caudal.present, w: (g, X) => .3 + X.P.fast * 2.2, ap: (g, s) => { mx(g, 'fins.finlets.count', [3, 5, 7][s - 1]); if (s === 3) mx(g, 'body.keel', .8); } },
-  { id: 'walk', n: 'Walking fins', st: ['the pectoral fins thicken at the base', 'the fins grow muscular and limb-like', 'it props itself on limb-fins to walk'], can: (g, X) => STDLIKE(X) && g.fins.pectoral.present && g.fins.pectoral.shape !== 'limb' && X.role === 'bottom' && !X.deep, w: () => .6, ap: (g, s) => { if (s === 1) mx(g, 'fins.pectoral.baseLen', .3); if (s >= 2) g.fins.pectoral.shape = 'limb'; if (s === 3) { g.fins.pectoral.opacity = 1; mx(g, 'head.eyeV', .75); } } },
-  { id: 'camo', n: 'Cryptic skin', st: ['blotches break up the outline', 'the pattern deepens into mottle', 'a leaf-litter disguise hides the fish'], can: (g, X) => g.skin.pattern !== 'mottle' || g.skin.patternStrength < .85, w: (g, X) => .5 + (X.role === 'bottom' || X.role === 'ambush' ? 2 : 0) + (X.hab.id === 'kelpForest' || X.hab.id === 'seagrass' ? 1 : 0), ap: (g, s) => { g.skin.pattern = s === 1 ? 'spots' : 'mottle'; mx(g, 'skin.patternStrength', [.5, .7, .88][s - 1]); g.skin.iridescence = Math.min(g.skin.iridescence, [.5, .3, .15][s - 1]); } },
-  { id: 'wings', n: 'Gliding wings', st: ['the pectoral fins broaden', 'the fins stretch into airfoils', 'wing-like pectorals let it glide'], can: (g, X) => STDLIKE(X) && g.fins.pectoral.present && g.fins.pectoral.shape !== 'wing' && X.plan === 'std' && (X.hab.floor === false || X.hab.id === 'skySea') && X.role !== 'bottom', w: () => .35, ap: (g, s) => { setN(g, 'fins.pectoral.len', g.fins.pectoral.len * [1.25, 1.3, 1.2][s - 1]); if (s >= 2) g.fins.pectoral.shape = 'wing'; if (s === 3) mx(g, 'fins.pectoral.len', 1.7); } }
-];
-const NOV = Object.fromEntries(NOVELTIES.map(n => [n.id, n]));
-function ecoCtx(g) {
-  const hab = HABITATS[g.meta.habitat] || HABITATS.coralReef, P = AX(g), R = roleOf(g), plan = planOf(g), dark = clamp(1 - Math.pow(hab.light, .35), 0, 1);
-  return { hab, P, role: R.top, plan, upright: plan === 'upright', dark, deep: hab.tags.includes('deep'), fantasy: !!hab.fantasy, turbid: hab.fog > .1 && hab.light < .7 && !hab.fantasy };
-}
-const cleanName = n => String(n || 'fish').replace(/^Evolved\s+/i, '').replace(/\s*[/·]\s*(step|gen)\s*\d+$/i, '');
-function evoState(g) {
-  const e = g.meta.evo || {}, st = { step: e.step || 0, base: e.base || cleanName(g.meta.name), nov: Object.assign({}, e.nov), don: e.don ? { val: e.don.val, seed: e.don.seed, done: !!e.don.done, anc: e.don.anc || 0, L0: e.don.L0 || 0, th: e.don.th ? Object.assign({}, e.don.th) : null, prog: Object.assign({}, e.don.prog) } : null, hab: e.hab ? { id: e.hab.id, p: e.hab.p, t: Object.assign({}, e.hab.t), seed: e.hab.seed, notes: (e.hab.notes || []).slice(), base: e.hab.base ? Object.assign({}, e.hab.base) : null, adapted: e.hab.adapted ? Object.assign({}, e.hab.adapted) : null } : null, last: e.last ? Object.assign({}, e.last) : null, log: (e.log || []).slice(-13) };
-  return st;
-}
-/* ── event 1: coupled adaptive drift (momentum gives orthogenetic trends instead of a random walk) ── */
-function evDrift(c, st, rng, X, mag, only) {
-  const ids = ['speed', 'agility', 'feeding', 'shelter', 'display', 'finShape', 'tail', 'robust', 'pigment'], tags = new Set(c.meta.tags || []), w = {};
-  for (const id of ids) w[id] = (tags.has(ADAPTATIONS[id].weight) ? 3 : 1) * (X.upright && ['speed', 'agility', 'tail', 'shelter'].includes(id) ? .2 : 1) * (id === 'tail' && !c.fins.caudal.present ? 0 : 1);
-  const picks = only ? [only] : []; if (!only && st.last && w[st.last.id] && rng.chance(.55)) picks.push(st.last.id);
-  const want = only ? 1 : rng.int(2, 3); while (picks.length < want) { const id = rng.weighted(w); if (!picks.includes(id)) picks.push(id); }
-  const lines = []; let first = null;
-  for (const id of picks) {
-    const dir = st.last && id === st.last.id && rng.chance(.7) ? st.last.dir : (rng.chance(.5) ? 1 : -1); first = first || { id, dir };
-    applyAdaptation(c, id, dir * mag * rng.range(.85, 1.2) * (picks.length > 1 ? .8 : 1), true); lines.push(`${ADAPTATIONS[id].label} ${dir > 0 ? 'increases' : 'decreases'}: ${ADAPTATIONS[id].desc}`);
-  }
-  const dh = rng.range(-9, 9) * (.5 + mag * 3); for (const p of ['skin.base', 'skin.accent', 'skin.fin']) { const v = getP(c, p).slice(); v[0] = (v[0] + dh + 360) % 360; setP(c, p, v); }
-  setN(c, 'skin.patternScale', c.skin.patternScale * rng.range(.92, 1.1)); st.last = first;
-  return { kind: 'drift', title: 'Adaptive drift', lines: lines.concat(`Pigment drifts ${dh > 0 ? '+' : ''}${dh.toFixed(0)}° in hue.`) };
-}
-const JUMP_TRAITS = [['body.fineness', 1], ['body.width', .3], ['body.pedDepth', .1], ['head.lengthFrac', .1], ['mouth.gape', .15], ['fins.dorsal.height', .3], ['fins.pectoral.len', .3], ['fins.anal.height', .3], ['fins.caudal.span', .6]];
-/** largest relative distance between the fish and a target on the shape-defining traits (used to cap how much of the gap one step may close) */
-function gapOf(c, getT, paths) { let w = 0; for (const [p, fl] of JUMP_TRAITS) { if (paths && !paths.has(p)) continue; const x = getP(c, p), y = getT(p); if (typeof x === 'number' && typeof y === 'number') w = Math.max(w, Math.abs(y - x) / Math.max(Math.abs(x), fl)); } return w; }
-const STEP_LIM = .27;
-/* ── event 2: gene flow. Donor ancestry rises a little each step; every organ has its own adoption threshold, so
-   body, colour, fins and jaws move at different times (continuous traits blend, discrete traits switch at 50%) ── */
-const TH_RANGE = { body: [.12, .34], palette: [.05, .4], pattern: [.1, .55], scales: [.2, .65], sheen: [.1, .55], light: [.3, .75], face: [.2, .5], jaw: [.25, .55], eye: [.15, .55], ornament: [.45, .85], barbels: [.3, .75], dorsal: [.2, .5], anal: [.2, .55], pectoral: [.2, .55], pelvic: [.3, .65], tail: [.4, .75], extras: [.4, .85] };
-const easeP = x => x <= 0 ? 0 : x >= 1 ? 1 : x * x * (3 - 2 * x);
-function donorThresholds(seed) {
-  const r = new RNG('th:' + seed), th = {}; for (const id in TH_RANGE) th[id] = r.range(TH_RANGE[id][0], TH_RANGE[id][1]);
-  th.tail = Math.max(th.tail, th.body + .14); th.anal = (th.anal + th.dorsal) / 2; th.face = (th.face + th.jaw) / 2 + .02; return th;
-}
-function evDonor(c, st, rng, X, mag) {
-  if (!st.don) return null; const dn = st.don; if (dn.done) return null;
-  if (!dn.th) dn.th = donorThresholds(dn.seed);
-  const D = parentFrom(dn.val, c.meta.habitat, dn.seed), cp = planOf(c), compat = cp === planOf(D), W = .46, lines = [];
-  const adopt = ORGAN_DEFS.filter(([id, kind]) => id !== 'gills' && id in dn.th && !(kind === 'struct' && !compat) && !(id === 'jaw' && ['upright', 'pipe'].includes(cp))).map(x => x[0]);
-  const a0 = dn.anc, moved = []; let a1 = a0;
-  /* if no organ is due yet at this ancestry, let ancestry rise further within the same click so a step never stalls */
-  for (let spin = 0; spin < 10 && !moved.length && a1 < 1; spin++) {
-  a1 = Math.min(1, a1 + rng.range(.075, .115) * (.8 + mag * 2.2));
+/* ── crossing: organs are inherited as functional units; structure only moves between identical body plans ── */
+const both = (P, Q, f1, f2) => (f1(P) && f2(Q)) || (f1(Q) && f2(P));
+const SYN = {
+  burst: ['Burst-glider', (P, Q) => both(P, Q, p => p.fast > .5, p => p.agile > .55), g => { if (planOf(g) !== 'std') return null; g.fins.pectoral.shape = 'pointed'; setN(g, 'fins.pectoral.len', g.fins.pectoral.len * 1.2); if (g.fins.dorsal.present) g.fins.dorsal.shape = 'falcate'; if (g.fins.caudal.present && ['forked', 'lunate', 'emarginate'].includes(g.fins.caudal.type)) setN(g, 'fins.caudal.aspect', Math.max(g.fins.caudal.aspect, 2.8)); setN(g, 'body.keel', Math.max(g.body.keel, .6)); return 'swept pectorals and a falcate dorsal give speed without losing steering'; }, g => g.fins.pectoral.shape === 'pointed'],
+  armour: ['Armoured sprinter', (P, Q) => both(P, Q, p => p.armor > .5, p => p.fast > .5), g => { if (planOf(g) !== 'std') return null; g.skin.scale = 'scutes'; setN(g, 'skin.scaleSize', g.skin.scaleSize * 1.3); setN(g, 'body.keel', 1); for (const k of ['dorsal', 'anal', 'pectoral', 'caudal']) g.fins[k].flex = Math.min(g.fins[k].flex, .35); return 'armour is confined to keel scutes, keeping the trunk stiff yet streamlined'; }, g => g.skin.scale === 'scutes'],
+  dazzle: ['Dazzle camouflage', (P, Q) => both(P, Q, p => p.camo > .35, p => p.show > .5), g => { g.skin.pattern = 'disruptive'; g.skin.patternStrength = .85; g.skin.band = Math.max(g.skin.band, .6); g.skin.bandColor = [(g.skin.base[0] + 150) % 360, .75, .55]; return 'a broken pattern with a bright flash band confuses predators'; }, g => g.skin.pattern === 'disruptive'],
+  counter: ['Counter-illumination', (P, Q) => both(P, Q, p => p.dark > .3, p => p.show > .4), g => { g.skin.photophores = Math.max(g.skin.photophores, 18); g.skin.countershade = .9; return 'silvered flanks over a light-emitting belly erase the silhouette'; }, g => g.skin.photophores >= 10],
+  ribbon: ['Ribbon-fin body', (P, Q) => both(P, Q, p => p.eel > .4, p => p.eel < .1), g => { if (planOf(g) !== 'std') return null; setN(g, 'body.fineness', Math.max(g.body.fineness, lerp(g.body.fineness, 7, .6))); Object.assign(g.fins.dorsal, { shape: 'continuous', u0: .2, u1: .97 }); Object.assign(g.fins.anal, { shape: 'continuous', u1: .97 }); g.swim.mode = 'subcarangiform'; g.fins.caudal.type = 'rounded'; return 'a long body whose continuous dorsal and anal fins ripple like an eel\'s'; }, g => g.fins.dorsal.shape === 'continuous'],
+  aposematic: ['Warning colours', (P, Q) => P.spiny || Q.spiny, (g, rng) => { if (!g.fins.dorsal.present) return null; g.fins.dorsal.shape = 'spines'; setN(g, 'fins.dorsal.spines', Math.max(g.fins.dorsal.spines, 9)); g.skin.accent = [rng.pick([8, 30, 48]), .85, .52]; return 'a spined dorsal fin is paired with a bright aposematic accent'; }, g => g.fins.dorsal.shape === 'spines'],
+  engulfer: ['Engulfing filter-predator', (P, Q) => both(P, Q, p => p.pred > .5, p => p.filter > .4), g => { setN(g, 'mouth.gape', Math.max(g.mouth.gape, .8)); g.mouth.teeth = 'villiform'; setN(g, 'head.lengthFrac', g.head.lengthFrac * 1.08); setN(g, 'swim.freq', g.swim.freq * .8); return 'a very wide gape with fine teeth lets it gulp whole shoals'; }, g => g.mouth.gape >= .7],
+  omnivore: ['Omnivore dentition', (P, Q) => both(P, Q, p => p.pred > .45, p => p.grazer > .3), g => { g.mouth.teeth = 'triangular'; setN(g, 'mouth.teethCount', Math.max(10, g.mouth.teethCount * .7)); g.mouth.protrusible = true; return 'piercing teeth are reduced and set behind a protrusible jaw, so it can grab and crop'; }, g => g.mouth.teeth === 'triangular'],
+  benthicSprint: ['Low-drag benthic sprinter', (P, Q) => both(P, Q, p => p.flat > .5, p => p.fast > .5), g => { if (planOf(g) !== 'std') return null; setN(g, 'body.ventralFlat', Math.max(g.body.ventralFlat, .45)); setN(g, 'head.eyeV', Math.max(g.head.eyeV, .55)); setN(g, 'fins.pectoral.insertAngle', g.fins.pectoral.insertAngle + 15); setN(g, 'fins.pectoral.len', g.fins.pectoral.len * 1.12); return 'a flat belly and high-set eyes on a streamlined trunk; broad pectorals brace it against current'; }, g => g.body.ventralFlat >= .4],
+  mudwalk: ['Walking fins', (P, Q) => both(P, Q, p => p.flat > .4, p => p.surface > .5), g => { if (planOf(g) !== 'std') return null; g.fins.pectoral.shape = 'limb'; g.fins.pectoral.opacity = 1; setN(g, 'head.eyeV', Math.max(g.head.eyeV, .85)); return 'muscular limb-like pectorals and periscope eyes let it prop itself at the water line'; }, g => g.fins.pectoral.shape === 'limb'],
+  flash: ['Flash shoaling', (P, Q) => both(P, Q, p => p.show > .45, p => p.school > .5), g => { g.skin.pattern = 'stripes'; g.skin.iridescence = 1; g.skin.countershade = Math.max(g.skin.countershade, .85); return 'bold stripes over mirror-bright flanks make a shoal flicker as it turns'; }, g => g.skin.pattern === 'stripes'],
+  ambushSprint: ['Ambush-sprinter', (P, Q) => both(P, Q, p => p.camo > .35, p => p.fast > .5), g => { g.skin.pattern = 'saddles'; g.skin.patternStrength = Math.max(g.skin.patternStrength, .6); setN(g, 'body.keel', Math.max(g.body.keel, .4)); return 'saddle camouflage hides it until a powerful tail launches the strike'; }, g => g.skin.pattern === 'saddles'],
+  glass: ['Glass tissue', (P, Q) => P.glass > .35 || Q.glass > .35, (g, rng, P, Q) => { setN(g, 'skin.translucency', Math.max(g.skin.translucency, Math.max(P.glass, Q.glass) * .8)); g.skin.belly[2] = Math.max(g.skin.belly[2], .9); return 'pigment-poor, watery tissue shows through the skin'; }, g => g.skin.translucency >= .25],
+  biocamo: ['Living-light camouflage', (P, Q) => both(P, Q, p => p.dark > .3, p => p.camo > .35), g => { g.skin.photophores = Math.max(g.skin.photophores, 14); g.skin.pattern = 'mottle'; return 'a mottled skin dotted with light organs matches the flicker of its surroundings'; }, g => g.skin.photophores >= 8 && g.skin.pattern === 'mottle'],
+  sailrun: ['Sail runner', (P, Q) => both(P, Q, p => p.fast > .5, p => p.sail > 0), g => { if (planOf(g) !== 'std' || !g.fins.dorsal.present) return null; g.fins.dorsal.shape = 'sail'; setN(g, 'fins.dorsal.height', Math.max(g.fins.dorsal.height, .9)); g.fins.dorsal.u0 = Math.min(g.fins.dorsal.u0, .15); g.fins.dorsal.u1 = Math.max(g.fins.dorsal.u1, .55); return 'a tall sail raised on a fast, slim body steers shoals of prey'; }, g => g.fins.dorsal.shape === 'sail'],
+  whisker: ['Whisker net', (P, Q) => both(P, Q, p => p.whisker > .4, p => p.dark > .3), g => { if (['beak', 'tube'].includes(g.mouth.type)) return null; setN(g, 'head.barbels', Math.max(g.head.barbels, 3)); setN(g, 'head.barbelLen', Math.max(g.head.barbelLen, .6)); g.skin.lateralLine = 1; return 'long barbels and a full lateral line feel prey in the dark'; }, g => g.head.barbels >= 2]
+};
+/**
+ * Cross two genomes. The chassis parent keeps the structural body plan (axis, tail, fins, gills); every other organ is inherited as a unit from whichever
+ * parent expresses it more distinctively, then coupled trade-off traits emerge. Structural organs never move between incompatible plans.
+ */
+function hybridize(A, B, ratio, seed) {
+  const rng = new RNG('hyb:' + seed + ':' + ratio), wB = clamp(ratio + rng.gauss() * .07, .03, .97), bIsC = rng.chance(wB);
+  const C = bIsC ? B : A, D = bIsC ? A : B, wC = bIsC ? wB : 1 - wB, wD = 1 - wC, cp = planOf(C), dp = planOf(D), compat = cp === dp, g = deepClone(C), organs = {}, dec = {};
+  const take = (id, fromD, mode) => {
+    const src = fromD ? D : C, oth = fromD ? C : D, w = mode === 'blend' ? rng.range(.2, .48) : mode === 'over' ? -rng.range(.1, .22) : 0;
+    for (const p of ORG_PATHS[id] || []) {
+      const e = SCHEMA[p], vs = getP(src, p), vo = getP(oth, p);
+      if (e.t === 'n' || e.t === 'i') setN(g, p, w > 0 ? blendN(p, vs, vo, w) : w < 0 ? vs + (vs - vo) * -w : vs);
+      else if (e.t === 'hsl') setP(g, p, w > 0 ? mixC(vs, vo, w) : vs.slice()); else setP(g, p, cp3(vs));
+    }
+  };
+  const hardHead = x => ['hammer', 'bill', 'sword'].includes(x.head.special), headUnit = hardHead(C) || hardHead(D), headFromD = headUnit ? (hardHead(D) && !hardHead(C) ? rng.chance(.5 + .35 * (wD - .5)) : hardHead(C) && !hardHead(D) ? rng.chance(wD * .35) : rng.chance(wD)) : false;
   for (const [id, kind] of ORGAN_DEFS) {
-    if (id === 'gills' || !(id in dn.th)) continue; if (kind === 'struct' && !compat) continue; if (id === 'jaw' && ['upright', 'pipe'].includes(cp)) continue;
-    const p0 = dn.prog[id] || 0; if (a1 >= 1 && p0 >= .99 && p0 < 1) { dn.prog[id] = 1; continue; } let p1 = a1 >= 1 ? 1 : easeP((a1 - dn.th[id] + W) / (2 * W)); if (p1 <= p0 + .004) continue;
+    if (id === 'gills' || id === 'palette' || id === 'body') continue;
+    const blocked = kind === 'struct' && !compat, sC = signature(C, id), sD = signature(D, id); let fromD = false, mode = 'whole';
+    if (!blocked) {
+      if (headUnit && ['face', 'jaw', 'ornament', 'eye'].includes(id)) { fromD = headFromD; mode = 'whole'; }
+      else if (id === 'face' && dec.jaw !== undefined && rng.chance(.65)) fromD = dec.jaw; else if (id === 'anal' && dec.dorsal !== undefined && rng.chance(.7)) fromD = dec.dorsal;
+      else fromD = rng.chance(clamp(wD + rng.gauss() * .06 + .22 * (sD - sC), .04, .96));
+      if (!(headUnit && ['face', 'jaw', 'ornament', 'eye'].includes(id))) mode = fromD ? rng.weighted({ whole: 4.5, blend: 3.6, over: .9 }) : rng.weighted({ whole: 5.5, blend: 3.5, over: .5 }); take(id, fromD, mode);
+    }
+    dec[id] = fromD; organs[id] = { from: blocked ? 'plan' : fromD ? 'donor' : 'chassis', mode: blocked ? '-' : mode, sig: [+sC.toFixed(2), +sD.toFixed(2)] };
+  }
+  const tBody = clamp(wD + rng.gauss() * .06, .04, .96), simple = x => ['std', 'ribbon', 'molid'].includes(x);
+  for (const p of ORG_PATHS.body) {
+    const vc = getP(C, p), vd = getP(D, p);
+    if (compat) setN(g, p, blendN(p, vc, vd, tBody)); else if (['body.fineness', 'body.width', 'body.snoutDepth'].includes(p) && simple(cp) && simple(dp)) setN(g, p, blendN(p, vc, vd, tBody * .38));
+  }
+  organs.body = { from: compat ? 'blend' : 'plan', mode: compat ? 'blend' : 'pull', sig: [+signature(C, 'body').toFixed(2), +signature(D, 'body').toFixed(2)] };
+  if (dec.tail) for (const p of ['body.pedDepth', 'body.pedWidth', 'body.pedU', 'body.tailTaper', 'body.backPow', 'body.superNTail']) setN(g, p, blendN(p, getP(g, p), getP(D, p), .55));
+  /* palette: one parent supplies the body colour, the other re-appears as accent, belly tint and fins */
+  const palD = rng.chance(clamp(wD + .2 * (signature(D, 'palette') - signature(C, 'palette')), .05, .95)), P1 = palD ? D : C, P2 = palD ? C : D;
+  g.skin.base = mixC(P1.skin.base, P2.skin.base, rng.range(.18, .42)); g.skin.belly = mixC(P1.skin.belly, P2.skin.belly, .35 + rng.range(-.1, .15)); g.skin.accent = mixC(P2.skin.accent, P2.skin.base, .5);
+  if (Math.abs(g.skin.accent[2] - g.skin.base[2]) < .18) g.skin.accent[2] = clamp(g.skin.base[2] + (g.skin.base[2] > .5 ? -.3 : .3), .05, .95);
+  g.skin.fin = mixC(dec.dorsal ? D.skin.fin : C.skin.fin, dec.dorsal ? C.skin.fin : D.skin.fin, .25); organs.palette = { from: palD ? 'donor' : 'chassis', mode: 'blend', sig: [+signature(C, 'palette').toFixed(2), +signature(D, 'palette').toFixed(2)] };
+  const pc = C.skin.pattern, pd = D.skin.pattern;
+  if (pc !== pd && pc !== 'none' && pd !== 'none') { const keep = g.skin.pattern, other = keep === pc ? pd : pc; g.skin.band = Math.max(g.skin.band, .55); g.skin.bandColor = mixC(P2.skin.accent, P2.skin.base, .4); if (other !== keep) g.meta.layered = other; }
+  g.skin.electric = !!(A.skin.electric || B.skin.electric); g.skin.inflate = !!(A.skin.inflate || B.skin.inflate && g.body.width >= .5);
+  g.meta = Object.assign({}, C.meta, { seed: String(seed), surfaceSeed: String(seed), species: null, parentSpecies: null, repairs: [], edited: true, novel: true, adapted: C.meta.adapted || null, parents: [A.meta.name, B.meta.name] });
+  for (const k of ['evolution', 'mutation', 'notes', 'adaptBase', 'evo', 'layered', 'adaptDone', 'evoTraits']) delete g.meta[k];
+  /* emergent trade-off traits: only appear when the two parents really conflict or complement each other */
+  const P = AX(A), Q = AX(B), syn = [], order = shuffle(rng, Object.keys(SYN));
+  for (const id of order) { if (syn.length >= 4) break; const s = SYN[id]; if (!s[1](P, Q)) continue; const t = s[2](g, rng, P, Q); if (t) syn.push({ id, t: s[0] + ': ' + t + '.' }); }
+  if (Math.abs(P.size - Q.size) > .4) syn.push({ id: 'size', t: `Size compromise: ${A.body.length.toFixed(2)} m × ${B.body.length.toFixed(2)} m settles at ${g.body.length.toFixed(2)} m (geometric blend).` });
+  const chain = [].concat(A.meta.hybrid ? A.meta.hybrid.chain : [A.meta.name], B.meta.hybrid ? B.meta.hybrid.chain : [B.meta.name]);
+  const nounsOf = X => X.meta.hybrid && X.meta.hybrid.nouns && X.meta.hybrid.nouns.length ? X.meta.hybrid.nouns : [nounOf(X.meta.name)];
+  let nouns = [...new Set([...nounsOf(A), ...nounsOf(B)])]; if (nouns.length > 3) nouns = [nouns[0], nouns[1], nouns[nouns.length - 1]];
+  g.meta.name = nouns.join('-');
+  g.meta.hybrid = { a: A.meta.name, b: B.meta.name, nouns, na: nouns[0], nb: nouns[nouns.length - 1], ratio: +ratio.toFixed(2), chassis: C.meta.name, plan: cp, donorPlan: dp, compat, organs, syn, chain: chain.slice(0, 6) };
+  return g;
+}
+/* ── habitat syndromes: the habitat's physical factors × the fish's own ecological role → coupled anatomical changes ── */
+const ROLE_TXT = { ambush: 'ambush predator', hunter: 'pursuit hunter', school: 'shoaling forager', grazer: 'grazer', filter: 'filter feeder', bottom: 'bottom dweller', armor: 'armoured browser', ribbon: 'ribbon-bodied lurker', upright: 'upright hoverer', display: 'display fish', generalist: 'generalist' };
+function roleOf(g) {
+  const P = AX(g), r = { ambush: P.pred * (.3 + P.camo * .8 + (1 - P.fast) * .5 + P.flat * .3), hunter: P.pred * (.25 + P.fast * 1.1), school: (1 - P.pred) * (.2 + P.school), grazer: P.grazer * 1.1, filter: P.filter * 1.2, bottom: P.flat * .95, armor: P.armor * .85, ribbon: P.eel, upright: g.body.posture > 45 ? 2 : 0, display: P.show * .8 };
+  const order = Object.keys(r).sort((a, b) => r[b] - r[a]); return { top: r[order[0]] > .12 ? order[0] : 'generalist', second: r[order[1]] > .12 ? order[1] : order[0], r };
+}
+const PAL_PULL = { openOcean: .6, mesopelagic: .7, abyssal: .85, hadal: .7, sandFlat: .6, polar: .5, kelpForest: .45, rockyShore: .4, seagrass: .5, mangrove: .5, brackish: .45, fastRiver: .45, slowRiver: .5, mountainStream: .45, lake: .45, blackwater: .5, floodplain: .35, cave: .8, coralReef: .12, deepReef: .25, lavaLake: .9, skySea: .5, crystalCavern: .6, void: .9 };
+function adaptHab(g, hab, rng) {
+  const touched = {}, notes = [], tag = new Set(g.meta.tags || []), keep = p => { if (!(p in touched)) touched[p] = cp3(getP(g, p)); };
+  const M = (p, f) => { keep(p); setN(g, p, getP(g, p) * f); }, Dd = (p, d) => { keep(p); setN(g, p, getP(g, p) + d); }, S = (p, v) => { keep(p); setP(g, p, cp3(v)); }, Lm = (p, l) => { keep(p); const c2 = getP(g, p).slice(); c2[2] = clamp(c2[2] * l, .02, .96); setP(g, p, c2); };

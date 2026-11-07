@@ -1,235 +1,147 @@
-    let f = p0 >= 1 ? 1 : (p1 - p0) / (1 - p0); const gap = gapOf(c, p => getP(D, p), new Set(ORG_PATHS[id])); if (gap > 0) f = Math.min(f, Math.max(.07, STEP_LIM / gap)); if (p0 < 1) p1 = p0 + f * (1 - p0);
-    const flip = (p1 >= .5 && p0 < .5) || p1 >= .999; if (p1 >= .999) p1 = 1;
-    for (const p of ORG_PATHS[id]) {
-      if (p === 'body.length') continue;
-      const e = SCHEMA[p], cv = getP(c, p), dv = getP(D, p);
-      if (e.t === 'n' || e.t === 'i') setN(c, p, blendN(p, cv, dv, f)); else if (e.t === 'hsl') setP(c, p, mixC(cv, dv, f)); else if (flip) setP(c, p, cp3(dv));
-    }
-    if (id === 'body') { dn.L0 = dn.L0 || c.body.length; const target = Math.exp(lerp(Math.log(dn.L0), Math.log(D.body.length), p1)); setN(c, 'body.length', clamp(target, c.body.length / 1.4, c.body.length * 1.4)); }
-    dn.prog[id] = p1; moved.push({ id, p0, p1, flip });
+  const R = roleOf(g), P = AX(g), role = R.top, plan = planOf(g), upright = plan === 'upright';
+  const H = { dark: clamp(1 - Math.pow(hab.light, .35), 0, 1), deep: hab.tags.includes('deep'), cold: hab.tags.includes('cold') || ['abyssal', 'hadal'].includes(hab.id), flow: { fastRiver: 1, mountainStream: 1, slowRiver: .3, rockyShore: .5, kelpForest: .25 }[hab.id] || 0,
+    cover: ['coralReef', 'kelpForest', 'mangrove', 'floodplain', 'blackwater', 'crystalCavern', 'deepReef', 'rockyShore', 'seagrass'].includes(hab.id), open: hab.floor === false, bottom: hab.tags.includes('benthic') || ['abyssal', 'hadal', 'sandFlat', 'cave', 'deepReef'].includes(hab.id), turbid: hab.fog > .1 && hab.light < .7 && !hab.fantasy };
+  notes.push(`Ecological role here: ${ROLE_TXT[role]}${R.second !== role ? ', with ' + ROLE_TXT[R.second] + ' tendencies' : ''}.`);
+  if (H.dark > .25) {
+    if (['bottom', 'grazer', 'ribbon', 'armor'].includes(role) || tag.has('cave')) { M('head.eyeSize', 1 - .55 * H.dark); S('skin.lateralLine', 1); if (!['beak', 'tube'].includes(g.mouth.type)) { Dd('head.barbels', Math.round(2 * H.dark)); S('head.barbelLen', Math.max(g.head.barbelLen, .6)); } if (H.dark > .9 && tag.has('cave')) S('head.eyeSide', 'none'); notes.push('Little light reaches the bottom: eyes shrink while a full lateral line and barbels take over sensing.'); }
+    else if (role === 'ambush' && H.dark > .55 && !upright) { S('head.special', 'esca'); S('head.specialLen', .22 + .4 * P.pred); S('head.specialWidth', .05); S('skin.photophores', Math.max(g.skin.photophores, 10)); S('skin.glow', [185, .9, .65]); M('mouth.gape', 1.2); if (!['beak', 'tube'].includes(g.mouth.type)) { S('mouth.teeth', 'needle'); S('mouth.teethCount', Math.max(g.mouth.teethCount, 30)); } notes.push('Sit-and-wait predator in the dark: a glowing lure, a wider gape and needle teeth.'); }
+    else if (role === 'hunter' && H.dark > .45) { M('head.eyeSize', 1 + .6 * H.dark); M('mouth.gape', 1 + .35 * H.dark); if (!['beak', 'tube'].includes(g.mouth.type)) S('mouth.teeth', 'fang'); S('skin.photophores', Math.round(14 + 30 * H.dark)); S('skin.glow', [rng.range(185, 215), 1, .62]); S('skin.iridescence', 0); Lm('skin.base', .55); notes.push('Dark-water hunter: huge light-gathering eyes, fang-like teeth and a row of belly photophores.'); }
+    else if (H.dark > .35) { S('skin.photophores', Math.round(18 + 40 * H.dark * (1 - P.armor * .6))); S('skin.glow', [rng.range(185, 215), 1, .62]); M('head.eyeSize', 1 + .7 * H.dark); S('skin.countershade', .3); Lm('skin.base', .6); notes.push('Counter-illumination: belly light organs match the faint glow from above, and the eyes grow large.'); }
+    else { M('head.eyeSize', 1 + H.dark); S('skin.eye', [165, .85, .5]); M('skin.iridescence', 1 - .6 * H.dark); notes.push('Eyes enlarge and gain a reflective layer; the skin sheen is dulled.'); }
+    if (H.deep && H.dark > .6 && !upright) { S('skin.translucency', clamp(.2 + .45 * (1 - P.armor), 0, .7)); M('swim.freq', .55); M('fins.dorsal.height', .8); M('body.width', 1.15); S('skin.gloss', .8); notes.push('Food is scarce at depth: watery, low-density tissues and slow strokes save energy.'); }
   }
+  if (H.cold) { M('body.length', 1.12); M('skin.iridescence', .6); if (['bottom', 'ambush', 'hunter'].includes(role)) { Dd('skin.translucency', .12); Lm('skin.base', 1.25); } notes.push('Cold water: a larger body, dulled sheen and paler pigment.'); }
+  if (H.flow > .3 && !upright) { M('body.fineness', 1 + .18 * H.flow); M('body.pedDepth', 1 - .2 * H.flow); M('fins.pectoral.len', 1 + .3 * H.flow); Dd('body.ventralFlat', .3 * H.flow); Dd('fins.pectoral.insertAngle', 25 * H.flow); M('swim.freq', 1 + .25 * H.flow); notes.push('Fast water: a streamlined trunk, narrow tail root and broad pectorals that pin the body to the bottom.'); }
+  if (H.cover && !upright) { M('body.fineness', .87); M('fins.pectoral.len', 1.2); M('fins.caudal.aspect', .85); if (role === 'ambush' || role === 'bottom') { S('skin.pattern', 'disruptive'); S('skin.patternStrength', Math.max(g.skin.patternStrength, .75)); S('skin.patternScale', 1.4); notes.push('Structured habitat: a deeper body, rowing fins and a broken pattern that dissolves against rock and weed.'); } else if (role === 'school') { S('skin.pattern', 'stripes'); notes.push('Structured habitat: a deeper body, rowing fins and vertical-flicker stripes for shoaling among obstacles.'); } else { if (rng.chance(.5)) S('skin.pattern', rng.pick(['bars', 'mottle', 'stripes'])); S('skin.patternStrength', Math.max(g.skin.patternStrength, .65)); notes.push('Structured habitat: a deeper, more manoeuvrable body, rowing fins and bolder markings.'); } if (hab.id === 'coralReef' || hab.id === 'deepReef') Dd('skin.iridescence', .25); }
+  if (H.open && H.dark < .5 && !upright) { M('body.fineness', 1.12); S('skin.countershade', .85); Dd('skin.iridescence', .25); M('fins.caudal.aspect', 1.15); M('fins.dorsal.height', .88); notes.push('Open water: a sleeker body, silvered counter-shaded skin and a higher-aspect tail.'); }
+  if (H.bottom && !upright) { Dd('body.ventralFlat', .3); Dd('head.eyeV', .18); if (H.deep) M('fins.pelvic.len', 1.5); notes.push('Bottom-hugging form: flattened belly and upward-set eyes' + (H.deep ? ', pelvic fins lengthened into stilts.' : '.')); }
+  if (H.turbid && H.dark < .6) { if (['bottom', 'grazer', 'armor'].includes(role) && !['beak', 'tube'].includes(g.mouth.type)) { Dd('head.barbels', 2); S('head.barbelLen', Math.max(g.head.barbelLen, .45)); } S('skin.lateralLine', 1); M('head.eyeSize', .9); if (['school', 'display', 'generalist', 'hunter'].includes(role) && !upright) { S('mouth.type', 'superior'); Dd('body.dorsalFlat', .25); notes.push('Murky surface water: an upturned mouth for the surface film and an enhanced lateral line.'); } else notes.push('Murky water: touch-sensing barbels and a full lateral line replace sight.'); }
+  const FX = {
+    lavaLake: () => { S('skin.scale', 'plates'); S('skin.photophores', 26); S('skin.glow', [25, 1, .55]); if (g.fins.dorsal.present) S('fins.dorsal.shape', 'spines'); S('skin.base', [10, .3, .08]); S('skin.belly', [18, .9, .45]); return 'Ember form: heat-proof plates, a glowing belly and a spined crest.'; },
+    skySea: () => { if (!upright) { S('fins.pectoral.shape', 'wing'); S('fins.pectoral.len', Math.max(g.fins.pectoral.len, 1.9)); S('fins.pectoral.insertAngle', 10); } S('skin.translucency', .6); S('skin.iridescence', 1); return 'Sky form: wing-like pectorals, translucent skin and a rainbow sheen.'; },
+    crystalCavern: () => { S('skin.scale', 'plates'); S('skin.translucency', .75); S('skin.gloss', 1); S('skin.iridescence', 1); S('skin.photophores', 10); S('skin.glow', [285, .8, .7]); return 'Crystal form: faceted translucent plates that refract glow.'; },
+    void: () => { M('head.eyeSize', 1.6); S('skin.photophores', 60); S('skin.glow', [275, 1, .7]); S('skin.base', [265, .3, .04]); S('skin.belly', [265, .3, .08]); if (!['beak', 'tube'].includes(g.mouth.type)) { S('head.barbels', 4); S('head.barbelLen', 1.2); } return 'Void form: huge eyes, near-black skin, a star-field of lights and long sensory barbels.'; }
+  };
+  if (FX[hab.id]) notes.push(FX[hab.id]());
+  if (['cave', 'mountainStream', 'rockyShore', 'coralReef', 'seagrass'].includes(hab.id) && g.body.length > .9) { M('body.length', .6); notes.push('A small, structured habitat caps body size.'); } else if (hab.id === 'openOcean' && g.body.length < .4) M('body.length', 1.25);
+  /* palette: functional colour (camouflage) is pulled strongly toward the habitat; reef colour hardly at all */
+  const k = clamp((PAL_PULL[hab.id] || .4) * (.6 + .5 * (P.camo + H.dark * .5)), .1, .9), hr = rng.pick(hab.pal.h), th = rng.range(hr[0], hr[1]), tl = (hab.pal.l[0] + hab.pal.l[1]) / 2, ts = (hab.pal.s[0] + hab.pal.s[1]) / 2;
+  for (const [p, w] of [['skin.base', 1], ['skin.accent', .6], ['skin.fin', .75], ['skin.belly', .5]]) { keep(p); const c2 = getP(g, p).slice(), dh = ((th - c2[0] + 540) % 360) - 180; c2[0] = (c2[0] + dh * k * w + 360) % 360; c2[1] = clamp(lerp(c2[1], Math.min(c2[1], ts * 1.35 + .1), k * .6 * w), 0, 1); if (p !== 'skin.belly') c2[2] = clamp(lerp(c2[2], tl, (.3 * H.dark + .1) * k), .03, .95); setP(g, p, c2); }
+  const ba = g.skin.base, ac = g.skin.accent; if (Math.abs(ac[2] - ba[2]) < .14) S('skin.accent', [ac[0], ac[1], clamp(ba[2] + (ba[2] > .45 ? -.28 : .28), .05, .95)]);
+  notes.push(`Colour is pulled ${Math.round(k * 100)}% toward the ${hab.n.toLowerCase()} palette.`);
+  g.meta.adapted = { from: (g.meta.adapted && g.meta.adapted.from) || g.meta.habitat, to: hab.id, speculative: false }; g.meta.habitat = hab.id;
+  return { notes, touched };
+}
+function nameHybrid(c, hab) { if (!c.meta.hybrid) return; const h = c.meta.hybrid, ad = HAB_ADJ[hab.id] || hab.n.toLowerCase(); c.meta.name = (ad.charAt(0).toUpperCase() + ad.slice(1) + ' ' + (h.nouns || [h.na, h.nb]).join('-')).trim(); c.meta.sci = 'Chimaerichthys ' + h.na.slice(0, 4) + h.nb.slice(0, 4) + 'ensis (hybrid concept)'; }
+// @@PART js/app.part17.js (17/19) lines 3391-3568 of the original module script -- stripped by build.mjs
+/** Adapt an unfinalised genome to a habitat, repair, audit and name it (retries with fresh draws if anything is unsound). */
+function adaptFinish(pre, habId, seed) {
+  const hab = HABITATS[habId]; let c;
+  for (let i = 0; i < 4; i++) {
+    c = deepClone(pre); c.meta.repairs = []; const r2 = new RNG('adapt:' + seed + habId + i);
+    c.meta.adapted = { from: pre.meta.adapted ? pre.meta.adapted.from : pre.meta.habitat, to: habId, speculative: false }; c.meta.habitat = habId; finalize(c, r2);
+    const res = adaptHab(c, hab, r2); c.meta.notes = res.notes; c.meta.adaptBase = res.touched; c.meta.repairs = []; finalize(c, r2);
+    if (c.meta.hybrid) c.meta.hybrid.syn = c.meta.hybrid.syn.filter(s => !SYN[s.id] || SYN[s.id][3](c));
+    if (!violations(c).length && !structuralAudit(c).length) break;
+    if (i === 2) { pre = deepClone(pre); pre.head.special = 'none'; pre.head.specialLen = SCHEMA['head.specialLen'].def; }
   }
-  dn.anc = a1; const finished = a1 >= 1 && adopt.every(id => (dn.prog[id] || 0) >= .99); if (finished) { dn.done = true; dn.anc = 1; }
-  if (!moved.length) return finished ? { kind: 'gene flow', title: 'Gene flow complete (100%)', lines: ['Every adoptable organ now matches ' + cleanName(D.meta.name) + '.'] } : null;
-  moved.sort((x, y) => (y.p1 - y.p0) - (x.p1 - x.p0));
-  lines.push(`Donor ancestry ${pct(a0)}% → ${pct(a1)}%.`);
-  for (const m of moved.slice(0, 3)) lines.push(`${ORGAN_LABEL[m.id]} ${pct(m.p0)}% → ${pct(m.p1)}% of ${cleanName(D.meta.name)}${m.p1 >= 1 ? ' (fixed)' : m.flip && m.p0 < .5 ? ' (discrete traits switch)' : ''}`);
-  if (moved.length > 3) lines.push(`${moved.length - 3} more organs shifting.`);
-  return { kind: 'gene flow', title: 'Gene flow from ' + cleanName(D.meta.name) + ' (' + pct(a1) + '%)', lines };
+  nameHybrid(c, hab); return c;
 }
-/* ── event 3: selection toward a habitat. The fully adapted target is computed once; each step closes part of the gap ── */
-function evHabitat(c, st, rng, X, mag, habId) {
-  const id = habId || (st.hab && st.hab.id); if (!id || !HABITATS[id]) return null; const hab = HABITATS[id];
-  if (!st.hab && c.meta.adapted && c.meta.adapted.to === id && c.meta.habitat === id && c.meta.adaptDone === id) return null;
-  if (st.hab && st.hab.id === id && (!st.hab.t || !Object.keys(st.hab.t).length)) st.hab = null;
-  if (!st.hab || st.hab.id !== id) {
-    const pre = deepClone(c), base = c.meta.adaptBase; if (base) for (const p in base) if (SCHEMA[p]) setP(pre, p, cp3(base[p]));
-    const seed = Math.random().toString(36).slice(2, 8), T = adaptFinish(pre, id, seed), t = {};
-    for (const p in SCHEMA) { if (ORG_OF[p] === 'gills') continue; const a = getP(c, p), b = getP(T, p), e = SCHEMA[p]; const diff = e.t === 'n' || e.t === 'i' ? Math.abs(a - b) > (e.max - e.min) * .004 : e.t === 'hsl' ? Math.abs(((a[0] - b[0] + 540) % 360) - 180) > 2 || Math.abs(a[1] - b[1]) > .02 || Math.abs(a[2] - b[2]) > .02 : a !== b; if (diff) t[p] = cp3(b); }
-    st.hab = { id, p: 0, t, seed, notes: T.meta.notes, base: T.meta.adaptBase, adapted: T.meta.adapted };
-  }
-  const h = st.hab, p0 = h.p; let f = Math.min(1, rng.range(.24, .36) * (.8 + mag * 2) / Math.max(.05, 1 - p0)); const gap = gapOf(c, p => h.t[p]); if (gap > 0) f = Math.min(f, Math.max(.07, STEP_LIM / gap));
-  let p1 = Math.min(1, p0 + f * (1 - p0)); if (p1 >= .995) { p1 = 1; f = 1; } const flip = p1 >= .5 && p0 < .5 || p1 >= 1;
-  let moved = 0; for (const p in h.t) { const e = SCHEMA[p], cv = getP(c, p), tv = h.t[p]; if (e.t === 'n' || e.t === 'i') { setN(c, p, blendN(p, cv, tv, f)); moved++; } else if (e.t === 'hsl') { setP(c, p, mixC(cv, tv, f)); moved++; } else if (flip) { setP(c, p, cp3(tv)); moved++; } }
-  h.p = p1; if (p1 >= .4 && c.meta.habitat !== id) { c.meta.adapted = { from: c.meta.habitat, to: id, speculative: false }; c.meta.habitat = id; }
-  const notes = h.notes || [], lines = [`${Math.round(p0 * 100)}% → ${Math.round(p1 * 100)}% adapted to ${hab.n.toLowerCase()} (${moved} traits shifting).`]; if (notes.length) lines.push(notes[st.step % notes.length]);
-  if (p1 >= 1) { c.meta.adapted = h.adapted || c.meta.adapted; c.meta.notes = notes; if (h.base) c.meta.adaptBase = h.base; c.meta.adaptDone = id; st.hab = null; lines.push('Adaptation complete.'); }
-  return { kind: 'selection', title: 'Selection toward ' + hab.n, lines };
+/** Re-adapt to another habitat from the pre-adaptation state, so habitat changes never compound. */
+function rehabitat(g, habId) {
+  const pre = deepClone(g), base = g.meta.adaptBase; if (base) for (const p in base) if (SCHEMA[p]) setP(pre, p, cp3(base[p]));
+  return adaptFinish(pre, habId, Math.random().toString(36).slice(2, 8));
 }
-/* ── event 4: innovation. New organs develop in stages (bud → working organ → elaborated) and only where ecology allows ── */
-function evInnovate(c, st, rng, X, only) {
-  const cur = id => st.nov[id] || 0;
-  const open = NOVELTIES.filter(n => cur(n.id) > 0 && cur(n.id) < n.st.length), fresh = NOVELTIES.filter(n => !cur(n.id) && n.can(c, X));
-  let pick = null;
-  if (only) pick = NOV[only]; else if (open.length && (!fresh.length || rng.chance(.55))) pick = rng.pick(open);
-  else if (fresh.length) { const w = {}; for (const n of fresh) w[n.id] = Math.max(.05, n.w(c, X)); pick = NOV[rng.weighted(w)]; }
-  if (!pick || cur(pick.id) >= pick.st.length || (!cur(pick.id) && !pick.can(c, X))) return null;
-  /* a stage whose effect is already present in this fish does not count: development continues to the next visible stage */
-  const base = deepClone(c), applied = []; let stage = cur(pick.id);
-  while (stage < pick.st.length) {
-    stage++; pick.ap(c, stage, rng, X); applied.push(stage);
-    const t = deepClone(c); t.meta.repairs = []; finalize(t, new RNG('probe:' + stage)); if (phenoDelta(base, t) >= .05) break;
-  }
-  st.nov[pick.id] = stage;
-  return { kind: 'innovation', title: `${pick.n} (stage ${stage}/${pick.st.length})`, lines: applied.map(k => pick.st[k - 1][0].toUpperCase() + pick.st[k - 1].slice(1) + '.') };
+function parentFrom(val, habId, seed) {
+  const [k, id] = val.split(':');
+  if (k === 'sp') { const s = SPECIES.find(x => x.id === id); return generate({ species: id, habitat: s.habitat, seed, noAdapt: true }); }
+  if (k === 'ni') { let best = null, bw = 0; for (const h in HABITATS) { const w = HABITATS[h].niches[id] || 0; if (w > bw) { bw = w; best = h; } } return generate({ niche: id, habitat: best || habId, noSpecies: true, seed }); }
+  return invent(habId, seed);
 }
-/** largest relative change of the shape-defining traits in one step (rule repairs can otherwise snap a body into a new shape) */
-function stepJump(a, b) {
-  let m = 0; const rel = (p, fl) => { const x = getP(a, p), y = getP(b, p); if (typeof x === 'number' && typeof y === 'number') m = Math.max(m, Math.abs(y - x) / Math.max(Math.abs(x), fl)); };
-  rel('body.fineness', 1); rel('body.width', .3); rel('body.pedDepth', .1); rel('head.lengthFrac', .1); rel('mouth.gape', .15);
-  for (const p of ['fins.dorsal.height', 'fins.pectoral.len', 'fins.anal.height']) rel(p, .3); if (a.fins.caudal.present && b.fins.caudal.present) rel('fins.caudal.span', .6);
-  return m;
-}
-function flipCount(a, b) { let n = 0; for (const p in SCHEMA) { const t = SCHEMA[p].t; if ((t === 's' || t === 'b') && getP(a, p) !== getP(b, p)) n++; } return n; }
-/**
- * One evolutionary event = one click. Events: drift, gene flow, habitat selection, innovation (or a single named module). Each candidate is repaired,
- * audited for body-plan soundness (no tail loss, no impossible fins) and must change the phenotype visibly; the best valid candidate is kept.
- */
-// @@PART js/app.part18.js (18/19) lines 3569-3749 of the original module script -- stripped by build.mjs
-function evolve(g0, o = {}) {
-  const strength = clamp(o.strength == null ? .55 : o.strength, .05, 1), seed = String(o.seed != null ? o.seed : g0.meta.seed + ':e' + Math.random()), rng = new RNG(seed), mode = o.mode || 'auto', st0 = evoState(g0);
-  if (o.donor) st0.don = st0.don && st0.don.val === o.donor ? st0.don : { val: o.donor, seed: 'd' + Math.random().toString(36).slice(2, 7), anc: 0, th: null, prog: {} };
-  if (o.habId && (mode === 'habitat' || mode === 'auto' && st0.hab)) { if (!st0.hab || st0.hab.id !== o.habId) st0.hab = null; }
-  const mag = lerp(.07, .2, strength), minD = .07 + .1 * strength, tries = [];
-  const plan = k => k === 'drift' ? ['drift'] : k === 'donor' ? ['donor', 'drift'] : k === 'habitat' ? ['habitat', 'drift'] : k === 'innovate' ? (o.only ? ['innovate'] : ['innovate', 'drift']) : ['module'];
-  let kinds; if (ADAPTATIONS[mode]) kinds = ['module']; else if (mode !== 'auto') kinds = plan(mode); else { const w = { drift: 3, innovate: st0.step >= 1 ? 1.5 : .8, donor: st0.don ? 3.5 : 0, habitat: st0.hab ? 3.5 : 0 }, a = []; for (let i = 0; i < 3; i++) { const k = rng.weighted(w); if (!a.includes(k)) a.push(k); delete w[k]; if (!Object.keys(w).some(x => w[x] > 0)) break; } kinds = a.concat('drift'); }
-  let best = null, bd = -1;
-  for (let attempt = 0; attempt < Math.min(25, 5 * kinds.length); attempt++) {
-    const kind = kinds[Math.min(kinds.length - 1, Math.floor(attempt / 5))], ai = attempt % 5, c = deepClone(g0), st = deepClone(st0), X = ecoCtx(c), m = mag * (1 + ai * .09);
-    c.meta.repairs = []; c.meta.edited = true; c.meta.seed = seed; delete c.meta.evolution; delete c.meta.mutation; c.meta.parentSpecies = g0.meta.species || g0.meta.parentSpecies || null; c.meta.species = null;
-    let ev = null; try {
-      if (kind === 'drift') ev = evDrift(c, st, rng, X, m); else if (kind === 'module') ev = evDrift(c, st, rng, X, m, mode);
-      else if (kind === 'donor') ev = evDonor(c, st, rng, X, m); else if (kind === 'habitat') ev = evHabitat(c, st, rng, X, m, o.habId); else if (kind === 'innovate') ev = evInnovate(c, st, rng, X, o.only);
-    } catch (e) { ev = null; }
-    if (!ev) continue; finalize(c, rng);
-    if (violations(c).length || structuralAudit(c).length) continue;
-    if (ai < 4 && stepJump(g0, c) > (.3 + .14 * strength) * (1 + .12 * ai)) continue;
-    if (ai < 3 && flipCount(g0, c) > 5) continue;
-    const d = phenoDelta(g0, c); if (d > bd) { best = { c, st, ev, d }; bd = d; } if (d >= minD || (ev.kind === 'innovation' && d >= .04) || (ev.kind === 'gene flow' && d >= .05)) break;
-  }
-  if (o.only && !best) throw new Error((NOV[o.only] ? NOV[o.only].n : 'That organ') + ' cannot develop any further in this body plan and habitat.');
-  if (!best || best.d < (best.ev.kind === 'innovation' ? (o.only ? -1 : .015) : best.ev.kind === 'gene flow' ? -1 : minD * .35)) throw new Error('This lineage has no visible step left for that pressure. Try another mutation type, set a gene-flow donor, or Innovate.');
-  const { c, st, ev } = best; st.step += 1; st.log.push({ n: st.step, k: ev.kind, t: ev.title, l: ev.lines.slice(0, 3).map(s => String(s).slice(0, 150)) }); st.log = st.log.slice(-8);
-  c.meta.evo = { step: st.step, base: st.base, nov: st.nov, don: st.don, hab: st.hab ? { id: st.hab.id, p: st.hab.p, t: st.hab.t, seed: st.hab.seed, notes: st.hab.notes, base: st.hab.base, adapted: st.hab.adapted } : null, last: st.last, log: st.log };
-  c.meta.name = `Evolved ${st.base} · gen ${st.step}`;
-  const novs = Object.keys(st.nov).filter(k => st.nov[k] > 0).map(k => NOV[k] && NOV[k].n.toLowerCase()).filter(Boolean); c.meta.evoTraits = novs.slice(0, 8);
-  c.meta.mutation = { source: g0.meta.name, modules: [], strength, shapeChange: +best.d.toFixed(4), changes: mutationChanges(g0, c), event: ev };
-  return c;
-}
-FG.evolve = evolve; FG.NOVELTIES = NOVELTIES; FG.phenoDelta = phenoDelta;
 
-/* ── Random = Wonder: 2–3 parents from every species, niche archetype and invented concept, crossed, given staged key innovations, adapted to the habitat ── */
-const WONDER_HIST = [];
-function wonderCandidate(habId, seed) {
-  const rng = new RNG('wonder:' + seed), pick = () => { const x = rng.next(); return x < .6 ? 'sp:' + rng.pick(SPECIES).id : x < .8 ? 'ni:' + rng.pick(Object.keys(NICHES)) : 'inv'; };
-  const A = parentFrom(pick(), habId, seed + 'a'), B = parentFrom(pick(), habId, seed + 'b'); let pre = hybridize(A, B, rng.range(.3, .7), seed), parents = 2;
-  if (rng.chance(.4)) { pre = hybridize(pre, parentFrom(pick(), habId, seed + 'c'), rng.range(.2, .4), seed + 'c'); parents = 3; }
-  pre.meta.habitat = habId; const X = ecoCtx(pre), nov = {};
-  for (let i = rng.int(1, 2); i > 0; i--) {
-    const fresh = NOVELTIES.filter(n => !nov[n.id] && n.can(pre, X)); if (!fresh.length) break; const w = {}; for (const n of fresh) w[n.id] = Math.max(.05, n.w(pre, X)), 0;
-    const nv = NOV[rng.weighted(w)], stage = rng.int(2, nv.st.length); for (let s = 1; s <= stage; s++) nv.ap(pre, s, rng, X); nov[nv.id] = stage; pre.meta.hybrid.syn.push({ id: 'nov:' + nv.id, t: `Key innovation, ${nv.n}: ${nv.st[stage - 1]}.` });
+/* ── phenotype distance: every evolutionary event must change something visible ── */
+function phenoDelta(a, b) {
+  let s = 0;
+  for (const p in SCHEMA) {
+    const e = SCHEMA[p], x = getP(a, p), y = getP(b, p);
+    if (e.t === 'n' || e.t === 'i') s += (/^(fins|body|head|mouth)\./.test(p) ? 1 : .6) * Math.min(.5, Math.abs(x - y) / Math.max(1e-6, e.max - e.min));
+    else if (e.t === 'hsl') s += .5 * Math.abs(((x[0] - y[0] + 540) % 360) - 180) / 180 + .25 * Math.abs(x[1] - y[1]) + .25 * Math.abs(x[2] - y[2]);
+    else if (x !== y) s += .12;
   }
-  const c = adaptFinish(pre, habId, seed); c.meta.evo = { step: 0, base: c.meta.name, nov, don: null, hab: null, last: null, log: [] };
-  return { c, A, B, parents, key: [nounOf(A.meta.name), nounOf(B.meta.name)].sort().join('+') + Object.keys(nov).join(',') };
+  return s;
 }
-function doWonder() {
-  clearTimeout(GOD.timer); clearTimeout(editTimer);
-  const habId = $('selHabitat').value || 'coralReef', base = Math.floor(Math.random() * 1e9).toString(36); let best = null, bs = -1e9;
-  $('selSpecies').value = ''; $('selClade').value = ''; $('selNiche').value = ''; $('seed').value = '';
-  for (let i = 0; i < 12; i++) {
-    try { const w = wonderCandidate(habId, base + ':' + i), c = w.c; if (violations(c).length || structuralAudit(c).length) continue;
-      const score = Math.min(phenoDelta(c, w.A), phenoDelta(c, w.B)) + c.meta.hybrid.syn.length * .45 + (w.parents === 3 ? .35 : 0) - (WONDER_HIST.includes(w.key) ? 2 : 0);
-      if (score > bs) { bs = score; best = w; } } catch (e) { /* unviable draw */ }
+const mx = (g, p, v) => setN(g, p, Math.max(getP(g, p), v)), mn = (g, p, v) => setN(g, p, Math.min(getP(g, p), v));
+const NOSNOUT = g => ['beak', 'tube'].includes(g.mouth.type), STDLIKE = X => ['std', 'flat', 'ribbon', 'pipe', 'chimaera', 'rigid'].includes(X.plan);
+/** Key innovations: each develops through stages (bud → working organ → elaborated), only where the fish's ecology and body plan allow it. */
+const NOVELTIES = [
+  { id: 'lure', n: 'Glowing lure', st: ['a fleshy bud sprouts on the snout', 'the bud lengthens into a flexible rod', 'the rod ends in a luminous bulb'], can: (g, X) => !['esca', 'bill', 'sword', 'hammer'].includes(g.head.special) && STDLIKE(X) && (X.role === 'ambush' || X.role === 'bottom' || X.dark > .3), w: (g, X) => .6 + (X.role === 'ambush' ? 2.2 : 0) + X.dark * 2, ap: (g, s, r, X) => { g.head.special = 'esca'; setN(g, 'head.specialLen', [.1, .24, .4][s - 1]); setN(g, 'head.specialWidth', [.03, .042, .055][s - 1]); if (s >= 2 && X.dark > .12) { mx(g, 'skin.photophores', s * 7); g.skin.glow = [r.range(170, 200), .9, .65]; } if (s === 3) mx(g, 'mouth.gape', .55); } },
+  { id: 'barbels', n: 'Sensory barbels', st: ['two short taste-buds appear at the lip', 'the barbels lengthen', 'a full whisker set senses prey by touch'], can: (g, X) => !NOSNOUT(g) && STDLIKE(X) && g.head.barbels < 4 && (['bottom', 'grazer', 'ambush', 'ribbon'].includes(X.role) || X.dark > .3 || X.turbid), w: (g, X) => .8 + (X.role === 'bottom' ? 1.6 : 0) + X.dark * 1.5, ap: (g, s) => { mx(g, 'head.barbels', [2, 2, 4][s - 1]); mx(g, 'head.barbelLen', [.3, .55, .85][s - 1]); if (s === 3) g.skin.lateralLine = 1; } },
+  { id: 'photo', n: 'Light organs', st: ['a few light organs dot the belly', 'rows of photophores form along the flanks', 'a dense constellation of lights covers the body'], can: (g, X) => (X.dark > .25 || X.fantasy) && g.skin.photophores < 50, w: (g, X) => .6 + X.dark * 2.6, ap: (g, s, r) => { mx(g, 'skin.photophores', [8, 22, 44][s - 1]); if (s === 1) g.skin.glow = [r.range(170, 215), .95, .62]; if (s === 3) mn(g, 'skin.gloss', 1); } },
+  { id: 'armor', n: 'Bony armour', st: ['scales thicken and gloss over', 'ridged scutes run along the keel', 'interlocking armour plates cover the flanks'], can: (g, X) => STDLIKE(X) && g.skin.scale !== 'plates' && X.plan !== 'ribbon', w: (g, X) => .5 + (X.role === 'armor' ? 2 : 0) + (X.role === 'bottom' ? 1 : 0) - X.P.fast * .3, ap: (g, s) => { if (s === 1) { setN(g, 'skin.scaleSize', g.skin.scaleSize * 1.25); mx(g, 'skin.gloss', .55); } if (s === 2) { g.skin.scale = 'scutes'; mx(g, 'body.keel', .7); } if (s === 3) { g.skin.scale = 'plates'; setN(g, 'skin.scaleSize', Math.max(1.8, g.skin.scaleSize)); for (const k of ['dorsal', 'anal', 'pectoral', 'caudal']) g.fins[k].flex = Math.min(g.fins[k].flex, .35); } } },
+  { id: 'sail', n: 'Sail fin', st: ['the dorsal fin lifts and sweeps back', 'the fin extends into a tall crest', 'a full display sail fans open'], can: (g, X) => STDLIKE(X) && g.fins.dorsal.present && g.fins.dorsal.shape !== 'sail' && g.fins.dorsal.height < 1.3, w: (g, X) => .6 + X.P.show * 1.5 + (X.role === 'display' ? 1.5 : 0), ap: (g, s, r) => { if (s === 1) { g.fins.dorsal.shape = g.fins.dorsal.shape === 'spines' ? 'spines' : 'falcate'; setN(g, 'fins.dorsal.height', g.fins.dorsal.height * 1.3); } if (s === 2) setN(g, 'fins.dorsal.height', Math.max(g.fins.dorsal.height * 1.25, .8)); if (s === 3) { g.fins.dorsal.shape = 'sail'; mx(g, 'fins.dorsal.height', 1); g.fins.dorsal.u0 = Math.min(g.fins.dorsal.u0, .18); g.fins.dorsal.u1 = Math.max(g.fins.dorsal.u1, .6); g.skin.fin = [(g.skin.base[0] + r.range(120, 200)) % 360, .75, .5]; } } },
+  { id: 'streamers', n: 'Trailing streamers', st: ['the pelvic fins lengthen', 'pelvic fins draw out into filaments', 'filaments trail from pelvic and dorsal fins'], can: (g, X) => STDLIKE(X) && g.fins.pelvic.present && g.fins.pelvic.shape !== 'filament', w: (g, X) => .6 + X.P.show, ap: (g, s) => { setN(g, 'fins.pelvic.len', g.fins.pelvic.len * (s === 1 ? 1.5 : 1.2)); if (s >= 2) g.fins.pelvic.shape = 'filament'; if (s === 3 && g.fins.dorsal.present && g.fins.dorsal.shape !== 'sail') { g.fins.dorsal.shape = 'filament'; setN(g, 'fins.dorsal.height', g.fins.dorsal.height * 1.25); } } },
+  { id: 'veil', n: 'Veil tail', st: ['the tail broadens', 'the tail flows into long, soft lobes', 'a full veil-tail with floating margins'], can: (g, X) => STDLIKE(X) && g.fins.caudal.present && g.fins.caudal.type !== 'fantail' && X.P.fast < .55 && X.plan !== 'ribbon' && X.plan !== 'rigid', w: (g, X) => .5 + (1 - X.P.fast) + (X.role === 'display' ? 1.4 : 0), ap: (g, s) => { setN(g, 'fins.caudal.span', g.fins.caudal.span * [1.12, 1.18, 1.15][s - 1]); if (s >= 2) { g.swim.mode = 'subcarangiform'; g.fins.caudal.type = 'fantail'; g.fins.caudal.flex = Math.max(g.fins.caudal.flex, .8); g.fins.caudal.opacity = Math.min(g.fins.caudal.opacity, .75); } if (s === 3) setN(g, 'fins.caudal.len', Math.max(g.fins.caudal.len, .34)); } },
+  { id: 'spines', n: 'Venomous spines', st: ['dorsal rays harden into spines', 'the spines lengthen and spread', 'a crown of warning-coloured spines'], can: (g, X) => STDLIKE(X) && g.fins.dorsal.present && !(g.fins.dorsal.shape === 'spines' && g.fins.dorsal.spines >= 12), w: (g, X) => .6 + (X.role === 'bottom' ? 1.2 : 0) + (X.role === 'ambush' ? 1 : 0), ap: (g, s, r) => { mx(g, 'fins.dorsal.spines', [6, 9, 13][s - 1]); if (s >= 2) g.fins.dorsal.shape = 'spines'; if (s === 3) g.skin.accent = [r.pick([6, 28, 46]), .9, .52]; } },
+  { id: 'warn', n: 'Warning bands', st: ['a pale band appears across the flank', 'the band hardens into bold contrast', 'bold warning bars advertise danger'], can: (g, X) => g.skin.band < .75 && g.skin.pattern !== 'bars', w: (g, X) => .6 + (X.hab.id === 'coralReef' ? 1.4 : 0) + (X.P.spiny ? 1.6 : 0), ap: (g, s, r) => { setN(g, 'skin.band', [.4, .6, .8][s - 1]); g.skin.bandColor = [(g.skin.base[0] + r.range(150, 210)) % 360, .8, .55]; if (s === 3) { g.skin.pattern = 'bars'; mx(g, 'skin.patternStrength', .75); } } },
+  { id: 'silver', n: 'Mirror skin', st: ['the flanks begin to silver', 'a counter-shaded mirror sheen forms', 'mirror-bright flanks blink as it turns'], can: (g, X) => g.skin.iridescence < .9 && X.dark < .6, w: (g, X) => .5 + (X.role === 'school' ? 2 : 0) + (X.hab.floor === false ? 1.2 : 0), ap: (g, s) => { mx(g, 'skin.iridescence', [.45, .7, .95][s - 1]); mx(g, 'skin.countershade', [.5, .75, .9][s - 1]); } },
+  { id: 'eyes', n: 'Night vision', st: ['the eyes enlarge and warm in colour', 'the eyes grow a reflective layer', 'huge, forward-set tapetum eyes gather every photon'], can: (g, X) => g.head.eyeSide !== 'none' && X.dark > .15 && g.head.eyeSize < .45, w: (g, X) => .5 + X.dark * 2.2, ap: (g, s) => { setN(g, 'head.eyeSize', g.head.eyeSize * [1.15, 1.12, 1.15][s - 1]); g.skin.eye = [[150, .6, .46], [165, .85, .5], [178, .95, .58]][s - 1]; if (s === 3) setN(g, 'head.eyeForward', g.head.eyeForward + .08); } },
+  { id: 'periscope', n: 'Periscope eyes', st: ['the eyes shift upward on the skull', 'the eyes ride higher on bony brows', 'periscope eyes watch from the waterline'], can: (g, X) => g.head.eyeSide !== 'none' && STDLIKE(X) && g.head.eyeV < .8 && (X.role === 'bottom' || X.role === 'ambush' || X.P.surface > .3), w: (g, X) => .4 + (X.role === 'bottom' ? 1.5 : 0) + X.P.surface * 2, ap: (g, s) => { mx(g, 'head.eyeV', [.5, .68, .85][s - 1]); if (s >= 2) mx(g, 'head.brow', .5); } },
+  { id: 'fangs', n: 'Piercing teeth', st: ['the teeth sharpen', 'long needle teeth line the jaws', 'fangs and a wider gape for gripping prey'], can: (g, X) => !NOSNOUT(g) && g.mouth.teeth !== 'fang' && STDLIKE(X) && X.role !== 'filter' && X.role !== 'grazer', w: (g, X) => .5 + X.P.pred * 2, ap: (g, s) => { g.mouth.teeth = ['villiform', 'needle', 'fang'][s - 1]; mx(g, 'mouth.teethCount', [30, 26, 16][s - 1]); setN(g, 'mouth.gape', g.mouth.gape * 1.08); } },
+  { id: 'crushers', n: 'Crushing jaws', st: ['the teeth blunt into pavement', 'a stout jaw bears molar plates', 'a powerful beak-like crushing mouth'], can: (g, X) => !NOSNOUT(g) && STDLIKE(X) && !['molar', 'beak'].includes(g.mouth.teeth) && (X.role === 'grazer' || X.role === 'armor' || X.role === 'bottom'), w: (g, X) => .4 + X.P.grazer * 2 + X.P.armor, ap: (g, s) => { g.mouth.teeth = s === 1 ? 'villiform' : 'molar'; if (s === 3) setN(g, 'head.cheek', Math.max(g.head.cheek, .6)); setN(g, 'mouth.gape', g.mouth.gape * .9); mx(g, 'mouth.teethCount', 14); } },
+  { id: 'electric', n: 'Electric organ', st: ['muscle tissue begins to hum with charge', 'an electric organ lights the flanks', 'a strong electric discharge organ'], can: (g, X) => !g.skin.electric && (['ribbon', 'knife', 'std'].includes(X.plan)) && (X.turbid || X.dark > .25 || X.hab.id === 'blackwater' || X.hab.id === 'floodplain'), w: (g, X) => .4 + (X.plan === 'ribbon' || X.plan === 'knife' ? 1.8 : 0) + X.dark, ap: (g, s) => { if (s >= 2) g.skin.electric = true; if (s === 3) { g.skin.glow = [200, .8, .62]; mx(g, 'skin.photophores', 6); } } },
+  { id: 'inflate', n: 'Defensive inflation', st: ['the belly stretches', 'the skin hardens into prickles', 'it can balloon into a spiny sphere'], can: (g, X) => !g.skin.inflate && ['std', 'rigid'].includes(X.plan) && g.body.fineness < 5, w: () => .5, ap: (g, s) => { if (s === 1) setN(g, 'body.width', Math.min(.8, g.body.width * 1.15)); if (s === 2) { g.skin.scale = 'denticle'; setN(g, 'body.width', Math.min(.85, g.body.width * 1.1)); } if (s === 3) { g.skin.inflate = true; mx(g, 'fins.dorsal.spines', 4); } } },
+  { id: 'glass', n: 'Glass tissue', st: ['pigment thins out', 'the body turns half-transparent', 'near-invisible glass body'], can: (g, X) => g.skin.translucency < .6 && STDLIKE(X) && (X.dark > .2 || X.hab.floor === false), w: (g, X) => .4 + X.dark * 1.5 + (X.hab.floor === false ? .8 : 0), ap: (g, s) => { mx(g, 'skin.translucency', [.25, .45, .68][s - 1]); g.skin.belly[2] = Math.max(g.skin.belly[2], .86); } },
+  { id: 'finlets', n: 'Speed finlets', st: ['small finlets bud behind the dorsal', 'a row of finlets forms', 'keeled finlets and a scute-ridged tail root'], can: (g, X) => g.fins.finlets.count < 5 && X.plan === 'std' && X.P.fast > .3 && g.fins.caudal.present, w: (g, X) => .3 + X.P.fast * 2.2, ap: (g, s) => { mx(g, 'fins.finlets.count', [3, 5, 7][s - 1]); if (s === 3) mx(g, 'body.keel', .8); } },
+  { id: 'walk', n: 'Walking fins', st: ['the pectoral fins thicken at the base', 'the fins grow muscular and limb-like', 'it props itself on limb-fins to walk'], can: (g, X) => STDLIKE(X) && g.fins.pectoral.present && g.fins.pectoral.shape !== 'limb' && X.role === 'bottom' && !X.deep, w: () => .6, ap: (g, s) => { if (s === 1) mx(g, 'fins.pectoral.baseLen', .3); if (s >= 2) g.fins.pectoral.shape = 'limb'; if (s === 3) { g.fins.pectoral.opacity = 1; mx(g, 'head.eyeV', .75); } } },
+  { id: 'camo', n: 'Cryptic skin', st: ['blotches break up the outline', 'the pattern deepens into mottle', 'a leaf-litter disguise hides the fish'], can: (g, X) => g.skin.pattern !== 'mottle' || g.skin.patternStrength < .85, w: (g, X) => .5 + (X.role === 'bottom' || X.role === 'ambush' ? 2 : 0) + (X.hab.id === 'kelpForest' || X.hab.id === 'seagrass' ? 1 : 0), ap: (g, s) => { g.skin.pattern = s === 1 ? 'spots' : 'mottle'; mx(g, 'skin.patternStrength', [.5, .7, .88][s - 1]); g.skin.iridescence = Math.min(g.skin.iridescence, [.5, .3, .15][s - 1]); } },
+  { id: 'wings', n: 'Gliding wings', st: ['the pectoral fins broaden', 'the fins stretch into airfoils', 'wing-like pectorals let it glide'], can: (g, X) => STDLIKE(X) && g.fins.pectoral.present && g.fins.pectoral.shape !== 'wing' && X.plan === 'std' && (X.hab.floor === false || X.hab.id === 'skySea') && X.role !== 'bottom', w: () => .35, ap: (g, s) => { setN(g, 'fins.pectoral.len', g.fins.pectoral.len * [1.25, 1.3, 1.2][s - 1]); if (s >= 2) g.fins.pectoral.shape = 'wing'; if (s === 3) mx(g, 'fins.pectoral.len', 1.7); } }
+];
+const NOV = Object.fromEntries(NOVELTIES.map(n => [n.id, n]));
+function ecoCtx(g) {
+  const hab = HABITATS[g.meta.habitat] || HABITATS.coralReef, P = AX(g), R = roleOf(g), plan = planOf(g), dark = clamp(1 - Math.pow(hab.light, .35), 0, 1);
+  return { hab, P, role: R.top, plan, upright: plan === 'upright', dark, deep: hab.tags.includes('deep'), fantasy: !!hab.fantasy, turbid: hab.fog > .1 && hab.light < .7 && !hab.fantasy };
+}
+const cleanName = n => String(n || 'fish').replace(/^Evolved\s+/i, '').replace(/\s*[/·]\s*(step|gen)\s*\d+$/i, '');
+function evoState(g) {
+  const e = g.meta.evo || {}, st = { step: e.step || 0, base: e.base || cleanName(g.meta.name), nov: Object.assign({}, e.nov), don: e.don ? { val: e.don.val, seed: e.don.seed, done: !!e.don.done, anc: e.don.anc || 0, L0: e.don.L0 || 0, th: e.don.th ? Object.assign({}, e.don.th) : null, prog: Object.assign({}, e.don.prog) } : null, hab: e.hab ? { id: e.hab.id, p: e.hab.p, t: Object.assign({}, e.hab.t), seed: e.hab.seed, notes: (e.hab.notes || []).slice(), base: e.hab.base ? Object.assign({}, e.hab.base) : null, adapted: e.hab.adapted ? Object.assign({}, e.hab.adapted) : null } : null, last: e.last ? Object.assign({}, e.last) : null, log: (e.log || []).slice(-13) };
+  return st;
+}
+/* ── event 1: coupled adaptive drift (momentum gives orthogenetic trends instead of a random walk) ── */
+function evDrift(c, st, rng, X, mag, only) {
+  const ids = ['speed', 'agility', 'feeding', 'shelter', 'display', 'finShape', 'tail', 'robust', 'pigment'], tags = new Set(c.meta.tags || []), w = {};
+  for (const id of ids) w[id] = (tags.has(ADAPTATIONS[id].weight) ? 3 : 1) * (X.upright && ['speed', 'agility', 'tail', 'shelter'].includes(id) ? .2 : 1) * (id === 'tail' && !c.fins.caudal.present ? 0 : 1);
+  const picks = only ? [only] : []; if (!only && st.last && w[st.last.id] && rng.chance(.55)) picks.push(st.last.id);
+  const want = only ? 1 : rng.int(2, 3); while (picks.length < want) { const id = rng.weighted(w); if (!picks.includes(id)) picks.push(id); }
+  const lines = []; let first = null;
+  for (const id of picks) {
+    const dir = st.last && id === st.last.id && rng.chance(.7) ? st.last.dir : (rng.chance(.5) ? 1 : -1); first = first || { id, dir };
+    applyAdaptation(c, id, dir * mag * rng.range(.85, 1.2) * (picks.length > 1 ? .8 : 1), true); lines.push(`${ADAPTATIONS[id].label} ${dir > 0 ? 'increases' : 'decreases'}: ${ADAPTATIONS[id].desc}`);
   }
-  if (!best) { toast('No viable wonder this time, press Random again.'); return; }
-  WONDER_HIST.push(best.key); if (WONDER_HIST.length > 24) WONDER_HIST.shift();
-  setFish(best.c); toast(`${best.c.meta.name}: ${(best.c.meta.hybrid.syn.slice(-1)[0] || { t: 'a new hybrid' }).t}`);
+  const dh = rng.range(-9, 9) * (.5 + mag * 3); for (const p of ['skin.base', 'skin.accent', 'skin.fin']) { const v = getP(c, p).slice(); v[0] = (v[0] + dh + 360) % 360; setP(c, p, v); }
+  setN(c, 'skin.patternScale', c.skin.patternScale * rng.range(.92, 1.1)); st.last = first;
+  return { kind: 'drift', title: 'Adaptive drift', lines: lines.concat(`Pigment drifts ${dh > 0 ? '+' : ''}${dh.toFixed(0)}° in hue.`) };
 }
-/* niche pressure for the Niche menu on hybrids and evolved fish */
-function pressNiche(g, ni, s) {
-  const ff = new Set(ni.ff), A = (id, a) => applyAdaptation(g, id, a * s, true), up = planOf(g) === 'upright';
-  if (!up) { if (ff.has('fastSwimmer')) A('speed', .6); if (ff.has('maneuverer')) A('agility', .6); if (ff.has('crevice')) A('shelter', .6); }
-  if (ff.has('predator')) A('feeding', .7);
-  if (ff.has('large')) setN(g, 'body.length', g.body.length * (1 + 1.2 * s));
-  if (ff.has('filterFeeder')) { g.mouth.gape = lerp(g.mouth.gape, .85, s); if (!NOSNOUT(g)) g.mouth.teeth = 'rasp'; }
-  if (ff.has('grazer')) { g.mouth.gape = lerp(g.mouth.gape, .2, s); if (s > .4 && !NOSNOUT(g)) g.mouth.teeth = 'molar'; }
-  if (ff.has('schooler')) { g.skin.iridescence = lerp(g.skin.iridescence, .85, s); g.skin.countershade = lerp(g.skin.countershade, .85, s); }
-  if (ff.has('camouflage') || ff.has('ambusher')) { if (s > .3) g.skin.pattern = 'mottle'; g.skin.patternStrength = lerp(g.skin.patternStrength, .75, s); g.skin.iridescence *= 1 - .6 * s; }
-  if ((ff.has('bottomDweller') || ff.has('flatBenthic')) && !up) { g.body.ventralFlat = lerp(g.body.ventralFlat, .7, s); g.head.eyeV = lerp(g.head.eyeV, .75, s); }
-  if (ff.has('deepSea')) { setN(g, 'head.eyeSize', g.head.eyeSize * (1 + .3 * s)); setN(g, 'skin.photophores', Math.max(g.skin.photophores, Math.round(20 * s))); g.skin.gloss = Math.max(g.skin.gloss, .7); }
-  if (ff.has('armored')) { if (s > .4) g.skin.scale = 'plates'; g.skin.scaleSize = lerp(g.skin.scaleSize, 2, s); }
-  return g;
+const JUMP_TRAITS = [['body.fineness', 1], ['body.width', .3], ['body.pedDepth', .1], ['head.lengthFrac', .1], ['mouth.gape', .15], ['fins.dorsal.height', .3], ['fins.pectoral.len', .3], ['fins.anal.height', .3], ['fins.caudal.span', .6]];
+/** largest relative distance between the fish and a target on the shape-defining traits (used to cap how much of the gap one step may close) */
+function gapOf(c, getT, paths) { let w = 0; for (const [p, fl] of JUMP_TRAITS) { if (paths && !paths.has(p)) continue; const x = getP(c, p), y = getT(p); if (typeof x === 'number' && typeof y === 'number') w = Math.max(w, Math.abs(y - x) / Math.max(Math.abs(x), fl)); } return w; }
+const STEP_LIM = .27;
+/* ── event 2: gene flow. Donor ancestry rises a little each step; every organ has its own adoption threshold, so
+   body, colour, fins and jaws move at different times (continuous traits blend, discrete traits switch at 50%) ── */
+const TH_RANGE = { body: [.12, .34], palette: [.05, .4], pattern: [.1, .55], scales: [.2, .65], sheen: [.1, .55], light: [.3, .75], face: [.2, .5], jaw: [.25, .55], eye: [.15, .55], ornament: [.45, .85], barbels: [.3, .75], dorsal: [.2, .5], anal: [.2, .55], pectoral: [.2, .55], pelvic: [.3, .65], tail: [.4, .75], extras: [.4, .85] };
+const easeP = x => x <= 0 ? 0 : x >= 1 ? 1 : x * x * (3 - 2 * x);
+function donorThresholds(seed) {
+  const r = new RNG('th:' + seed), th = {}; for (const id in TH_RANGE) th[id] = r.range(TH_RANGE[id][0], TH_RANGE[id][1]);
+  th.tail = Math.max(th.tail, th.body + .14); th.anal = (th.anal + th.dorsal) / 2; th.face = (th.face + th.jaw) / 2 + .02; return th;
 }
-function doMix() {
-  if (!App.genome) return; clearTimeout(GOD.timer); clearTimeout(editTimer);
-  const val = $('selMix').value; if (!val) { toast('Choose a second parent in "Mix with…" first.'); return; }
-  try {
-    const habId = $('selHabitat').value, seed = Math.floor(Math.random() * 1e9).toString(36), ratio = +$('mixRatio').value / 100;
-    const A = deepClone(App.genome), B = parentFrom(val, habId, 'b' + seed), pre = hybridize(A, B, ratio, seed);
-    if (val.startsWith('ni:') && ratio >= .5) pre.meta.niche = val.slice(3);
-    const c = adaptFinish(pre, habId, seed); c.meta.evo = { step: 0, base: c.meta.name, nov: {}, don: null, hab: null, last: null, log: [] }; setFish(c);
-    toast(`${c.meta.name}: ${(c.meta.hybrid.syn[0] || { t: 'organ-by-organ blend' }).t} Open Hybrid Lab for the full report.`);
-  } catch (e) { console.error(e); toast(e.message || 'Mix failed'); }
-}
-/* ── Mutate: gradual evolution (drift · gene flow · habitat selection · innovation) ── */
-function runEvolve(o = {}) {
-  if (!App.genome) return; clearTimeout(GOD.timer); clearTimeout(editTimer);
-  try {
-    const source = deepClone(App.genome); source.meta.godMode = GOD.enabled; let mode = o.mode || $('selMutation').value || 'auto'; const mixVal = $('selMix').value;
-    if (mode === 'donor' && !o.donor) { if (!mixVal) { toast('Gene flow needs a donor: pick one in "Mix with…" first.'); return; } o.donor = mixVal; }
-    if (mode === 'auto' && mixVal && source.meta.evo && source.meta.evo.don && source.meta.evo.don.val !== mixVal && !o.donor) o.donor = mixVal;
-    const g = evolve(source, Object.assign({ mode, strength: GOD.strength, habId: $('selHabitat').value, seed: source.meta.seed + ':e' + Math.floor(Math.random() * 1e9).toString(36) }, o));
-    setFish(g, { keepCamera: true }); if (g.meta.evo.hab && HABITATS[g.meta.evo.hab.id]) $('selHabitat').value = g.meta.evo.hab.id; const ev = g.meta.mutation.event; toast(`Gen ${g.meta.evo.step} · ${ev.title}. ${ev.lines[0]}`);
-  } catch (e) { toast(e.message || 'Mutation failed'); console.warn(e); }
-}
-function doMutate() { runEvolve(); }
-/* ── panels ── */
-const pct = x => Math.round(x * 100);
-const list = a => a && a.length ? '<ul>' + a.map(t => `<li class="god-copy" style="margin:0 0 6px">${esc(typeof t === 'string' ? t : t.t)}</li>`).join('') + '</ul>' : '<p class="god-copy">Nothing recorded yet.</p>';
-const bar = (p, label) => `<div class="evo-row"><span class="evo-lab">${esc(label)}</span><span class="bar-prog"><i style="width:${pct(clamp(p, 0, 1))}%"></i></span><span class="evo-pct">${pct(clamp(p, 0, 1))}%</span></div>`;
-PANELS.mix = body => {
-  const g = App.genome; if (!g) return; const h = g.meta.hybrid;
-  const rows = h ? Object.entries(h.organs).map(([k, v]) => `<tr><td>${esc(ORGAN_LABEL[k] || k)}</td><td>${v.from === 'plan' ? 'locked to body plan' : v.from === 'blend' ? 'blended' : esc(v.from)}</td><td>${esc(v.mode)}</td></tr>`).join('') : '';
-  body.innerHTML = `<p class="gene-lock">HYBRID LAB</p><h2 class="god-title">${esc(g.meta.name)}</h2>` + (h ? `<p class="god-copy">${esc(h.a)} × ${esc(h.b)} (second-parent share ${pct(h.ratio)}%). Body plan: <b>${esc(h.chassis)}</b> (${esc(h.plan)})${h.compat ? '' : ', incompatible with ' + esc(h.donorPlan) + ', so structural organs stay with the chassis and only surface organs cross'}.</p><div class="grp">Organ inheritance</div><table><tr><th>Organ</th><th>From</th><th>Mode</th></tr>${rows}</table><div class="grp">Emergent hybrid traits</div>${list(h.syn)}` : '<p class="god-copy">Pick a second parent in the top bar (Mix with…), set the share slider, choose a habitat and press Mix. Random builds a never-seen wonder for the chosen habitat.</p>')
-    + `<div class="grp">Habitat adaptation / ${esc(HABITATS[g.meta.habitat].n)}</div>${list(g.meta.notes)}<div class="panel-note">Changing the Habitat menu re-adapts this fish from its unadapted form, so each habitat produces its own coherent set of changes. Use Mutate with "Adapt to habitat" for the gradual version.</div>`;
-};
-PANELS.evo = body => {
-  const g = App.genome; if (!g) return; const st = evoState(g), mixVal = $('selMix').value;
-  const donor = st.don ? (() => { try { return parentFrom(st.don.val, g.meta.habitat, st.don.seed); } catch (e) { return null; } })() : null, X = ecoCtx(g);
-  const progs = donor ? bar(st.don.anc || 0, 'Donor ancestry') + Object.entries(st.don.prog).sort((x, y) => y[1] - x[1]).map(([k, p]) => bar(p, ORGAN_LABEL[k] || k)).join('') : '';
-  const avail = NOVELTIES.filter(n => (st.nov[n.id] || 0) < n.st.length && (n.can(g, X) || st.nov[n.id] > 0));
-  const dev = Object.keys(st.nov).filter(k => st.nov[k] > 0 && NOV[k]).map(k => bar(st.nov[k] / NOV[k].st.length, `${NOV[k].n} ${st.nov[k]}/${NOV[k].st.length}`)).join('');
-  body.innerHTML = `<p class="gene-lock">EVOLUTION LAB</p><h2 class="god-title">${esc(g.meta.name)}</h2><p class="god-copy">Generation ${st.step}. Each Mutate click is one evolutionary event: coupled drift, gene flow from a donor, selection toward a habitat, or a new organ developing in stages. Every step is repaired and audited, so the body plan stays sound. Undo restores the previous generation exactly.</p>`
-    + `<div class="grp">Gene flow</div>` + (donor ? `<p class="god-copy">Donor: <b>${esc(cleanName(donor.meta.name))}</b>. Organs move toward it a little each step; discrete traits switch at 50%.</p>${progs || '<p class="god-copy">No organ has started to change yet.</p>'}` : '<p class="god-copy">No donor set. Choose any species, niche or invented fish below.</p>')
-    + `<div class="row"><select id="evoDonor" aria-label="Gene-flow donor">${mixOptions(st.don ? st.don.val : mixVal)}</select><button class="sm" id="evoSetDonor">Set donor</button>${donor ? '<button class="sm" id="evoClearDonor">Clear</button>' : ''}</div>`
-    + `<div class="grp">Habitat selection</div>` + (st.hab ? bar(st.hab.p, 'Adapting to ' + HABITATS[st.hab.id].n) : '<p class="god-copy">No pressure set. Pick Mutation → "Adapt to habitat (gradual)" and choose a habitat in the top bar to begin.</p>')
-    + `<div class="grp">Key innovations</div>${dev || '<p class="god-copy">None yet. Use the buttons below or Mutation → Innovate.</p>'}<div class="evo-chips">${avail.map(n => `<button class="sm" data-nov="${n.id}" title="${esc(n.st[Math.min(n.st.length - 1, st.nov[n.id] || 0)])}">${st.nov[n.id] ? 'Develop' : 'Evolve'}: ${esc(n.n)}</button>`).join('') || '<span class="god-copy">No innovation fits this body plan and habitat.</span>'}</div>`
-    + `<div class="grp">Lineage log</div>${st.log.length ? '<ul>' + st.log.slice().reverse().map(e => `<li class="god-copy" style="margin:0 0 8px"><b>Gen ${e.n} · ${esc(e.t)}</b><br>${e.l.map(esc).join('<br>')}</li>`).join('') + '</ul>' : '<p class="god-copy">No generations yet.</p>'}`;
-  const redo = () => renderPanel('evo');
-  body.querySelector('#evoSetDonor').onclick = () => { const v = body.querySelector('#evoDonor').value; if (!v) { toast('Pick a donor first.'); return; } g.meta.evo = Object.assign({ step: 0, base: st.base, nov: st.nov, hab: st.hab, last: st.last, log: st.log }, { don: { val: v, seed: 'd' + Math.random().toString(36).slice(2, 7), anc: 0, th: null, prog: {} } }); redo(); toast('Donor set. Press Mutate (or Mutation → Gene flow) to start the transfer.'); };
-  const cl = body.querySelector('#evoClearDonor'); if (cl) cl.onclick = () => { g.meta.evo = Object.assign({}, g.meta.evo, { don: null }); redo(); };
-  body.querySelectorAll('[data-nov]').forEach(b => b.onclick = () => runEvolve({ mode: 'innovate', only: b.dataset.nov }));
-};
-function mixOptions(sel) { return '<option value="">Pick a fish…</option><option value="inv"' + (sel === 'inv' ? ' selected' : '') + '>✦ Invented concept fish</option><optgroup label="Niche archetypes">' + Object.values(NICHES).map(x => `<option value="ni:${x.id}"${sel === 'ni:' + x.id ? ' selected' : ''}>${esc(x.n)}</option>`).join('') + '</optgroup><optgroup label="Species">' + [...SPECIES].sort((a, b) => a.n.localeCompare(b.n)).map(s => `<option value="sp:${s.id}"${sel === 'sp:' + s.id ? ' selected' : ''}>${esc(s.n)}</option>`).join('') + '</optgroup>'; }
-function evolutionReport(g) {
-  const ev = g.meta.mutation && g.meta.mutation.event, st = g.meta.evo; if (!ev || !st) return '';
-  const changes = (g.meta.mutation.changes || []).filter(i => /^(body|head|fins|mouth)\./.test(i.path)).slice(0, 12);
-  return `<div class="grp">Generation ${st.step} / ${esc(ev.title)}</div>${list(ev.lines)}<table><tr><th>Trait</th><th>Before</th><th>Now</th><th>Change</th></tr>${changes.map(i => `<tr><td>${esc(i.path)}</td><td>${esc(i.from)}</td><td>${esc(i.to)}</td><td>${i.percent === null ? 'switched' : (i.percent > 0 ? '+' : '') + i.percent + '%'}</td></tr>`).join('')}</table>`;
-}
-function bindHybrid() {
-  const m = $('selMix'); m.innerHTML = '<option value="">Mix with…</option>' + mixOptions('').replace('<option value="">Pick a fish…</option>', '');
-  $('btnMix').onclick = doMix; $('btnRandom').onclick = doWonder;
-  $('selHabitat').addEventListener('change', () => {
-    if (!App.genome || $('selSpecies').value) return; const mode = $('selMutation').value;
-    if (mode === 'habitat') { toast('Selection pressure set: ' + HABITATS[$('selHabitat').value].n + '. Press Mutate to adapt step by step.'); return; }
-    const sg = App.genome.meta; if (sg.species && !sg.edited && !sg.hybrid && !sg.evo) { doGenerate({ species: sg.species, habitat: $('selHabitat').value, seed: sg.seed }); return; }
-    try { const c = rehabitat(App.genome, $('selHabitat').value); setFish(c, { keepCamera: true }); toast(`Adapted to ${HABITATS[c.meta.habitat].n}: ${(c.meta.notes || []).length} coupled changes (see Hybrid Lab).`); } catch (e) { console.error(e); toast(e.message || 'Adaptation failed'); }
-  });
-  $('selNiche').addEventListener('change', () => {
-    const g = App.genome, id = $('selNiche').value; if (!g || !g.meta.hybrid || !id) return;
-    try { const c = deepClone(g); pressNiche(c, NICHES[id], .8); c.meta.niche = id; c.meta.repairs = []; c.meta.notes = (c.meta.notes || []).concat('Niche shift to ' + NICHES[id].n.toLowerCase() + ': traits pushed toward that role.'); finalize(c); if (violations(c).length || structuralAudit(c).length) throw new Error('That niche does not fit this body plan.'); setFish(c, { keepCamera: true }); toast('Niche pressure applied: ' + NICHES[id].n); } catch (e) { console.error(e); toast(e.message || 'Niche shift failed'); }
-  });
-}
-FG.hybridize = hybridize; FG.adaptHab = adaptHab; FG.evolve = evolve; FG.structuralAudit = structuralAudit; FG.generate = generate; FG.stepJump = stepJump; FG.planOf = planOf; FG.wonderCandidate = wonderCandidate; FG.adaptFinish = adaptFinish; FG.evDonor = evDonor; FG.evoState = evoState; FG.ecoCtx = ecoCtx; FG.finalize = finalize; FG.violations = violations; FG.phenoDelta = phenoDelta;
-/* ── import hardening for the new meta fields (genomes arrive from URLs and files) ── */
-function sanitizeMetaExtras(src, dst) {
-  const str = (v, n) => String(v == null ? '' : v).slice(0, n), isn = v => typeof v === 'number' && isFinite(v);
-  const sval = (p, v) => { const e = SCHEMA[p]; if (!e) return undefined; if (e.t === 'n' || e.t === 'i') return isn(v) ? clamp(e.t === 'i' ? Math.round(v) : v, e.min, e.max) : undefined; if (e.t === 's') return e.opts.includes(v) ? v : undefined; if (e.t === 'b') return typeof v === 'boolean' ? v : undefined; if (e.t === 'hsl') return Array.isArray(v) && v.length === 3 && v.every(isn) ? [((v[0] % 360) + 360) % 360, clamp(v[1], 0, 1), clamp(v[2], 0, 1)] : undefined; };
-  const sparse = m => { const o = {}; if (m && typeof m === 'object') for (const p in m) { const v = sval(p, m[p]); if (v !== undefined) o[p] = v; } return o; };
-  const strs = (a, n, k) => Array.isArray(a) ? a.filter(t => typeof t === 'string').slice(0, n).map(t => t.slice(0, k)) : [];
-  if (src.hybrid && typeof src.hybrid === 'object') {
-    const h = src.hybrid, o = { ratio: isn(h.ratio) ? clamp(h.ratio, 0, 1) : .5, compat: h.compat === true, organs: {} };
-    for (const k of ['a', 'b', 'na', 'nb', 'chassis', 'plan', 'donorPlan']) o[k] = str(h[k], 96); o.nouns = strs(h.nouns, 3, 32);
-    o.chain = strs(h.chain, 8, 64); o.syn = (Array.isArray(h.syn) ? h.syn : []).slice(0, 12).map(s => ({ id: str(s && s.id, 24), t: str(s && s.t, 260) }));
-    if (h.organs && typeof h.organs === 'object') for (const k in h.organs) if (ORGAN_KIND[k]) { const v = h.organs[k] || {}; o.organs[k] = { from: str(v.from, 12), mode: str(v.mode, 12), sig: Array.isArray(v.sig) ? v.sig.slice(0, 2).map(x => isn(x) ? x : 0) : [0, 0] }; }
-    dst.hybrid = o;
-  }
-  if (Array.isArray(src.notes)) dst.notes = strs(src.notes, 40, 260);
-  if (src.adaptBase && typeof src.adaptBase === 'object') dst.adaptBase = sparse(src.adaptBase);
-  if (Array.isArray(src.evoTraits)) dst.evoTraits = strs(src.evoTraits, 8, 40);
-  if (src.evo && typeof src.evo === 'object') {
-    const e = src.evo, o = { step: Math.round(clamp(Number(e.step) || 0, 0, 100000)), base: str(e.base, 96), nov: {}, don: null, hab: null, last: null, log: [] };
-    if (e.nov && typeof e.nov === 'object') for (const k in e.nov) if (NOV[k] && isn(e.nov[k])) o.nov[k] = Math.round(clamp(e.nov[k], 0, NOV[k].st.length));
-    if (e.don && typeof e.don === 'object' && typeof e.don.val === 'string') { o.don = { val: str(e.don.val, 64), seed: str(e.don.seed, 32), done: e.don.done === true, L0: isn(e.don.L0) ? clamp(e.don.L0, 0, 40) : 0, anc: isn(e.don.anc) ? clamp(e.don.anc, 0, 1) : 0, th: null, prog: {} }; for (const k in e.don.prog || {}) if (ORGAN_KIND[k] && isn(e.don.prog[k])) o.don.prog[k] = clamp(e.don.prog[k], 0, 1); }
-    if (e.hab && typeof e.hab === 'object' && HABITATS[e.hab.id]) { const a = e.hab.adapted; o.hab = { id: e.hab.id, p: isn(e.hab.p) ? clamp(e.hab.p, 0, 1) : 0, seed: str(e.hab.seed, 16), t: sparse(e.hab.t), notes: strs(e.hab.notes, 40, 260), base: e.hab.base ? sparse(e.hab.base) : null, adapted: a && HABITATS[a.from] && HABITATS[a.to] ? { from: a.from, to: a.to, speculative: a.speculative === true } : null }; }
-    if (e.last && typeof e.last.id === 'string') o.last = { id: str(e.last.id, 32), dir: e.last.dir === -1 ? -1 : 1 };
+function evDonor(c, st, rng, X, mag) {
+  if (!st.don) return null; const dn = st.don; if (dn.done) return null;
+  if (!dn.th) dn.th = donorThresholds(dn.seed);
+  const D = parentFrom(dn.val, c.meta.habitat, dn.seed), cp = planOf(c), compat = cp === planOf(D), W = .46, lines = [];
+  const adopt = ORGAN_DEFS.filter(([id, kind]) => id !== 'gills' && id in dn.th && !(kind === 'struct' && !compat) && !(id === 'jaw' && ['upright', 'pipe'].includes(cp))).map(x => x[0]);
+  const a0 = dn.anc, moved = []; let a1 = a0;
+  /* if no organ is due yet at this ancestry, let ancestry rise further within the same click so a step never stalls */
+  for (let spin = 0; spin < 10 && !moved.length && a1 < 1; spin++) {
+  a1 = Math.min(1, a1 + rng.range(.075, .115) * (.8 + mag * 2.2));
+  for (const [id, kind] of ORGAN_DEFS) {
+    if (id === 'gills' || !(id in dn.th)) continue; if (kind === 'struct' && !compat) continue; if (id === 'jaw' && ['upright', 'pipe'].includes(cp)) continue;
+    const p0 = dn.prog[id] || 0; if (a1 >= 1 && p0 >= .99 && p0 < 1) { dn.prog[id] = 1; continue; } let p1 = a1 >= 1 ? 1 : easeP((a1 - dn.th[id] + W) / (2 * W)); if (p1 <= p0 + .004) continue;
