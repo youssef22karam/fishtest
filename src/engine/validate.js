@@ -3,7 +3,7 @@
    examined with the engine's analytic BodyModel — NO mesh is built before both stages pass. */
 import { AX_KEYS, DISC_KEYS, PALETTES, envelope, CLADES, SIZE_BANDS } from './clades.js';
 import { traitsToParams } from './mapping.js';
-import { assertLaws, finLaw, EYE_PROTRUSION_MAX, EYE_PROTRUSION, EYE_SEAT, CAVITY_MAX } from './laws.js';
+import { assertLaws, EYE_GEO, finLaw, EYE_PROTRUSION_MAX, EYE_PROTRUSION, EYE_SEAT, CAVITY_MAX } from './laws.js';
 
 export const INVARIANTS = ['symmetry', 'eyes', 'appendages', 'fins', 'mouth_gills', 'profile', 'colour', 'envelope', 'tail', 'plan'];
 export const EYE_BAND = [.03, .15];                 /* eye diameter / head length */
@@ -89,6 +89,7 @@ export function checkEngine(t, g, FG) {
   if (protrusion > EYE_PROTRUSION_MAX) fail('eyes', 'eye protrudes more than a third of its diameter');
   if (!(bm.hingeU >= lm.mouthCorner - EPS) || bm.hingeU > g.head.lengthFrac * g.head.gillStart + EPS) fail('mouth_gills', 'jaw hinge not between mouth corner and gill opening');
   if (bm.hingeU + EPS < Math.min(lm.eye, g.head.lengthFrac * g.head.gillStart - .006)) fail('mouth_gills', 'jaw hinge in front of the eye line');
+  if (FG.round2Check) { const r2 = FG.round2Check(bm); if (r2.length) fail('mouth_gills', r2[0]); }   /* round 2: see-through / floating teeth / eye protrusion → resample */
   if (Math.min(g.mouth.cavityDepth, CAVITY_MAX) > CAVITY_MAX + EPS) fail('mouth_gills', 'cavity deeper than 0.35 head length');
   /* ── round 1: jaw + side-fin laws (analytic part of the reject-and-resample gate) ── */
   { const Mj = bm.law.mouth, Pp = bm.law.pec, JM = FG.LAW.JAW_MAX_DEG, er = bm.eyeR / Math.max(1e-6, L);
@@ -104,6 +105,10 @@ export function checkEngine(t, g, FG) {
   if (whip) { if (bm.a.gills !== 'ventral') fail('plan', 'flattened plan gill openings not on the bottom surface'); if (!bm.ventralMouth) fail('plan', 'flattened plan mouth not on the bottom surface'); }
   /* ── eyes ── */
   if (g.head.eyeSide !== t.eyeSide) fail('symmetry', 'engine eye side differs from genome');
+  if (ax.plan.cartilaginous && !ax.plan.flat && !ax.plan.sideFlat && !ax.plan.headExpanded) {   /* round 2: cartilaginous-plan eye envelope (plan wins over niche / depth) */
+    const dEye = g.head.eyeSize * EYE_GEO;
+    if (dEye < .05 - 1e-4 || dEye > .11 + 1e-4) fail('eyes', `cartilaginous eye diameter ${dEye.toFixed(3)} × head length outside 0.05–0.11`);
+  }
   if (g.head.eyeSize < EYE_BAND[0] - EPS || g.head.eyeSize > EYE_BAND[1] + EPS) fail('eyes', `engine eye size ${g.head.eyeSize.toFixed(3)} outside 3–15% of head`);
   const eyes = [], fr = {}, s = {}, u = lm.eye, sides = g.head.eyeSide === 'both' ? [1, -1] : g.head.eyeSide === 'left' ? [1, 1] : [-1, -1];
   bm.frame(u, fr); bm.section(u, s);

@@ -10,8 +10,8 @@
    Everything is built in the head's own coordinates, so the eye moves with the head and mirrors exactly between sides. */
 import { EYE_SEAT } from './laws.js';
 
-export const LIMBUS = .78;            /* polar angle (rad) of the corneal rim measured from the optical axis */
-export const IRIS_RECESS = .12;       /* iris plane depth behind the limbus plane, in eyeball radii */
+export const LIMBUS = .62;            /* polar angle (rad) of the corneal rim measured from the optical axis */
+export const IRIS_RECESS = .03;       /* iris plane depth behind the limbus plane, in eyeball radii */
 
 /** pupil half-extents (fraction of the iris radius) along the head-forward (tu) and head-up (tv) directions */
 export function pupilExtents(pupil) {
@@ -70,7 +70,7 @@ export function buildOrgan(THREE, spec, E, seg) {
   const { center: c, R } = spec, F = eyeFrame(THREE, spec.axis, spec.forward, spec.up), { a, tu, tv } = F, TAU = Math.PI * 2;
   const nP = seg <= 8 ? 8 : Math.max(12, Math.min(40, Math.round(seg * 1.6))), at = (z, r, phi) => [c.x + a.x * z + (tu.x * Math.cos(phi) + tv.x * Math.sin(phi)) * r, c.y + a.y * z + (tu.y * Math.cos(phi) + tv.y * Math.sin(phi)) * r, c.z + a.z * z + (tu.z * Math.cos(phi) + tv.z * Math.sin(phi)) * r];
   const dir = (th, phi) => { const s = Math.sin(th); return [a.x * Math.cos(th) + (tu.x * Math.cos(phi) + tv.x * Math.sin(phi)) * s, a.y * Math.cos(th) + (tu.y * Math.cos(phi) + tv.y * Math.sin(phi)) * s, a.z * Math.cos(th) + (tu.z * Math.cos(phi) + tv.z * Math.sin(phi)) * s]; };
-  const opaque = [], glass = [], zLimb = R * Math.cos(LIMBUS), rLimb = R * Math.sin(LIMBUS), zIris = zLimb - IRIS_RECESS * R, zPup = zIris - .05 * R, ext = pupilExtents(E.pupil);
+  const opaque = [], glass = [], zLimb = R * Math.cos(LIMBUS), rLimb = R * Math.sin(LIMBUS), zIris = zLimb - IRIS_RECESS * R, zPup = zIris + .004 * R, ext = pupilExtents(E.pupil);
   /* sclera: the sphere minus the corneal cap */
   opaque.push(orient(THREE, makePart(THREE, Math.max(5, Math.round(nP * .5)), nP, true, (f, h) => { const th = LIMBUS + (Math.PI - LIMBUS) * f, phi = h * TAU, d = dir(th, phi); return { p: [c.x + d[0] * R, c.y + d[1] * R, c.z + d[2] * R], n: d, e: [th, phi, 0] }; }), v => v.clone().sub(c)));
   /* limbal funnel: collar from the limbus rim down to the recessed iris plane */
@@ -79,7 +79,7 @@ export function buildOrgan(THREE, spec, E, seg) {
   /* iris: annulus between the pupil outline and the limbal radius, on the recessed plane with a shallow conical dish toward the pupil */
   opaque.push(orient(THREE, makePart(THREE, nP <= 8 ? 2 : 6, nP, true, (f, h) => { const phi = h * TAU, ri = rLimb * .985, rp = rLimb * pupilRadius(ext, phi) * .985, r = lerp(rp, ri, f), z = lerp(zPup, zIris, Math.pow(f, .6)); return { p: at(z, r, phi), e: [f, phi, 1] }; }), v => a.clone()));
   /* pupil: concave dark lens cup behind the pupil opening */
-  opaque.push(orient(THREE, makePart(THREE, nP <= 8 ? 2 : 4, nP, true, (f, h) => { const phi = h * TAU, rp = rLimb * pupilRadius(ext, phi) * .985, r = rp * (1 - f), z = zPup - .11 * R * Math.sin(f * Math.PI * .5); return { p: at(z, Math.max(r, 1e-6), phi), e: [f, phi, 2] }; }), v => a.clone()));
+  opaque.push(orient(THREE, makePart(THREE, nP <= 8 ? 2 : 4, nP, true, (f, h) => { const phi = h * TAU, rp = rLimb * pupilRadius(ext, phi) * .985, r = rp * (1 - f), z = zPup; return { p: at(z, Math.max(r, 1e-6), phi), e: [f, phi, 2] }; }), v => a.clone()));
   /* cornea: transparent dome continuing the sphere, a touch proud of it */
   glass.push(orient(THREE, makePart(THREE, Math.max(4, Math.round(nP * .3)), nP, true, (f, h) => { const th = (LIMBUS + .02) * f, phi = h * TAU, d = dir(th, phi), Rc = R * (1.012 + .012 * Math.cos(th * 1.9)); return { p: [c.x + d[0] * Rc, c.y + d[1] * Rc, c.z + d[2] * Rc], n: d, e: [th, phi, 3] }; }), v => v.clone().sub(c)));
   /* covers */

@@ -45,47 +45,73 @@ export function buildBeak(bm, mats, H, M) {
   return out;
 }
 
-/** Interior cavity: a pocket rooted on the aperture outline, closed by a throat cap with a floor. Depth ≤ CAVITY_MAX × head length. */
+/* ── ROUND 2: ONE source of truth for the lip line. The lower-jaw patch edge, the pocket rim, the teeth rows and the skin shader's discard line all use jawEdgeVert / lipPoint. ── */
+export const jawU0 = bm => bm.jawStartU < .01 ? .0015 : Math.max(bm.jawStartU, .006);
+export const jawU1 = bm => bm.hingeU || bm.mcU;
+/** lip line as a height in sin(theta) units on the head section at station u (the lower patch edge is the asin of this) */
+export function jawEdgeVert(bm, u) {
+  const s = bm._es || (bm._es = {}); bm.section(u, s); const ym = bm.mouthLineY(u, s), yr = ym > 0 ? s.dUp : s.dDn, n = ym > 0 ? s.nD : s.nV;
+  return Math.sign(ym) * Math.pow(Math.min(.98, Math.abs(ym) / Math.max(yr, 1e-8)), n * .5);
+}
+/** movement weight of the one-piece lower jaw along its length: 1 at the chin, 0 at the hinge (junction never separates) */
+export const jawW = (bm, u, H) => 1 - H.sstep(.62, 1, H.clamp((u - jawU0(bm)) / Math.max(1e-6, jawU1(bm) - jawU0(bm)), 0, 1));
+export const EDGE_N = 40;
+export function edgeTable(bm, H) { const u0 = jawU0(bm), u1 = jawU1(bm), a = []; for (let i = 0; i < EDGE_N; i++) a.push(jawEdgeVert(bm, H.lerp(u0, u1, i / (EDGE_N - 1)))); return a; }
+/** point on the lip edge of one flank (side ±1) at station u, optionally pulled `inset` under the skin. Returns {x,y,z,ly,lz,fr}. */
+export function lipPoint(bm, u, side, H, inset = 0, out = {}) {
+  const fr = bm._lf || (bm._lf = {}), s = bm._ls || (bm._ls = {}), p = bm._lp || (bm._lp = {}); bm.frame(u, fr); bm.section(u, s);
+  const rim = Math.asin(jawEdgeVert(bm, u)), a = side > 0 ? rim : -Math.PI - rim; bm.point(u, a, p, fr, s, true);
+  const l = Math.hypot(p.ly, p.lz) || 1, off = -inset / l;
+  out.x = p.x + fr.nx * p.ly * off; out.y = p.y + fr.ny * p.ly * off; out.z = p.z + p.lz * off; out.ly = p.ly; out.lz = p.lz; out.tx = fr.tx; out.ty = fr.ty; out.nx = fr.nx; out.ny = fr.ny; return out;
+}
+
+/** Interior pocket (round 2): ONE closed bag rooted on the lip edge.
+    rim loop = upper lip copy (static) + lower lip copy (moves with the jaw, weight jawW) joined at both corners at the hinge;
+    hood (upper wall) and floor (lower wall) run from the rim to a throat cap; each flank gets a cheek wall between the upper and lower lip edge
+    (inset a little, rotating by the same weight ramp), so no line of sight leaves the head sideways; the chin cap closes the lower jaw's front.
+    Depth ≤ CAVITY_MAX × head length (as round 1). Rendered with the double-sided jaw material. */
 export function buildCavity(bm, mats, H) {
-  const { THREE } = H, g = bm.g, u0 = Math.max(bm.jawStartU, .006), u1 = bm.mcU * .92, um = (u0 + u1) / 2, hs = (u1 - u0) / 2 * .98;
-  const Mr = 22, N = 5, depth = Math.min(g.mouth.cavityDepth, CAVITY_MAX) * bm.h * bm.L;
-  const pos = [], ab = [], idx = [], rim = [], fr = {};
-  const uc = u1; bm.frame(uc, fr);
-  const rimC = new THREE.Vector3();
-  /* closed outline on the skin: right corner → tip → left corner along the upper lip (lower=false), back along the lower lip */
-  for (let j = 0; j < Mr; j++) {
-    const phi = j / Mr * H.TAU, lower = phi > Math.PI, lam = lower ? (phi - Math.PI) / Math.PI : phi / Math.PI;
-    const side = (lam < .5) === !lower ? 1 : -1, u = u1 - (u1 - u0) * Math.sin(Math.PI * lam), ap = apertureAt(bm, u, H);
-    const vert = mouthLevel(bm, u, H) + (lower ? -1 : 1) * ap * 1.04;
-    const p = skinPoint(bm, u, vert, side, new THREE.Vector3(), -bm.maxD * .004);
-    rim.push({ p, u, phi, lower, lam }); rimC.add(p);
-  }
-  rimC.multiplyScalar(1 / Mr);
+  const { THREE } = H, g = bm.g, u0 = jawU0(bm), u1 = jawU1(bm), K = 34, S = 8, N = 5, hl = bm.h * bm.L, depth = Math.min(g.mouth.cavityDepth, CAVITY_MAX) * hl;
+  const inset = bm.maxD * .004, us = []; for (let i = 0; i <= K; i++) us.push(H.lerp(u0, u1, Math.pow(i / K, 1.5)));
+  const P = (u, side) => { const o = lipPoint(bm, u, side, H, inset, {}); return new THREE.Vector3(o.x, o.y, o.z); };
+  const R = us.map(u => P(u, 1)), Lf = us.map(u => P(u, -1)), W = us.map(u => jawW(bm, u, H));
+  /* rim loop: right hinge → front (upper copy), front → left hinge, then back along the lower copy */
+  const rim = [];
+  for (let i = K; i >= 0; i--) rim.push({ p: R[i], u: us[i], w: 0 });
+  for (let i = 0; i <= K; i++) rim.push({ p: Lf[i], u: us[i], w: 0 });
+  for (let i = K; i >= 0; i--) rim.push({ p: Lf[i], u: us[i], w: W[i] });
+  for (let i = 0; i <= K; i++) rim.push({ p: R[i], u: us[i], w: W[i] });
+  const Mr = rim.length, rimC = new THREE.Vector3(); rim.forEach(r => rimC.add(r.p)); rimC.multiplyScalar(1 / Mr);
+  const fr = {}; bm.frame((u0 + u1) / 2, fr);
   const throat = rimC.clone().add(new THREE.Vector3(fr.tx * depth, fr.ty * depth, 0));
-  { /* the throat cap stays inside the head section at its own station (laterally expanded / thin heads included) */
-    const ut = H.clamp(uc + depth / bm.L, .004, .999), ft = {}, st = {}; bm.frame(ut, ft); bm.section(ut, st);
-    const ly = H.clamp((throat.x - ft.px) * ft.nx + (throat.y - ft.py) * ft.ny, -st.dDn * .55, st.dUp * .55);
-    throat.set(ft.px + ft.nx * ly, ft.py + ft.ny * ly, 0); }
-  let v = 0;
+  { const ut = H.clamp((u0 + u1) / 2 + depth / bm.L, .004, .999), ft = {}, st = {}; bm.frame(ut, ft); bm.section(ut, st);
+    const ly = H.clamp((throat.x - ft.px) * ft.nx + (throat.y - ft.py) * ft.ny, -st.dDn * .55, st.dUp * .55); throat.set(ft.px + ft.nx * ly, ft.py + ft.ny * ly, 0); }
+  const pos = [], ab = [], idx = [];
+  const push = (q, u, w) => { pos.push(q.x, q.y, q.z); ab.push(u, .5, 1, w); return pos.length / 3 - 1; };
   for (let i = 0; i <= N; i++) {
     const d = i / N, e = H.smoother(d), shrink = 1 - .25 * e;
     for (let j = 0; j < Mr; j++) {
       const r = rim[j], q = r.p.clone().lerp(throat, e).sub(throat).multiplyScalar(shrink).add(throat);
-      if (i > 0) { /* structural containment: interior vertices never leave the head section at their own station */
-        const uq = H.clamp((bm.headX - q.x) / bm.L, .004, .999), fq = {}, sq = {}; bm.frame(uq, fq); bm.section(uq, sq);
-        const ly = H.clamp((q.x - fq.px) * fq.nx + (q.y - fq.py) * fq.ny, -sq.dDn * .9, sq.dUp * .9), hw = bm.halfWidthAtY(sq, ly) * .92;
-        q.set(fq.px + fq.nx * ly, fq.py + fq.ny * ly, H.clamp(q.z, -hw, hw)); }
-      const w = r.lower ? Math.pow(1 - d, 1.4) * jawWeight(bm, r.u, H) * Math.min(1, Math.sin(Math.PI * r.lam) * 1.6 + .2) : 0;
-      pos.push(q.x, q.y, q.z); ab.push(r.u, .5, 1, w); v++;
+      if (i > 0) contain(bm, q, H, .9);
+      push(q, r.u, r.w * Math.pow(1 - d, 1.4));
     }
   }
-  const centre = v; pos.push(throat.x, throat.y, 0); ab.push(u1, .5, 1, 0);
   for (let i = 0; i < N; i++) for (let j = 0; j < Mr; j++) { const a = i * Mr + j, b = i * Mr + (j + 1) % Mr, c = a + Mr, d = b + Mr; idx.push(a, c, b, b, c, d); }
-  for (let j = 0; j < Mr; j++) idx.push(N * Mr + j, centre, N * Mr + (j + 1) % Mr);
-  /* medial septum: the pocket is closed in the mid-plane by a floor/palate sheet (rim outline → throat), so the open mouth is never see-through; the lower half follows the jaw */
-  { const nb = v + 1; for (let j = 0; j < Mr; j++) { const r = rim[j], w0 = r.lower ? jawWeight(bm, r.u, H) * Math.min(1, Math.sin(Math.PI * r.lam) * 1.6 + .2) : 0; pos.push(r.p.x, r.p.y, 0); ab.push(r.u, .5, 1, w0); }
-    pos.push(throat.x, throat.y, 0); ab.push(u1, .5, 1, 0);
-    for (let j = 0; j < Mr; j++) idx.push(nb + Mr, nb + j, nb + (j + 1) % Mr); }
+  const centre = push(throat, u1, 0); for (let j = 0; j < Mr; j++) idx.push(N * Mr + j, centre, N * Mr + (j + 1) % Mr);
+  /* cheek walls: a surface from the upper lip edge down to the lower lip edge on each flank. Interior points sit at the REST lip position pulled medially
+     (z → 85 % at mid-wall), then rotate by a weight ramp 0→jawW, so the wall is pinned to both lips at every jaw angle and never leaves the head. */
+  for (const side of [1, -1]) {
+    const base = pos.length / 3, arr = side > 0 ? R : Lf;
+    for (let i = 0; i <= K; i++) for (let j = 0; j <= S; j++) {
+      const f = j / S, q = arr[i].clone(); q.z *= 1 - .4 * H.sstep(0, .2, f) * H.sstep(1, .8, f) * H.sstep(0, .3, i / K + .02); push(q, us[i], W[i] * f);
+    }
+    for (let i = 0; i < K; i++) for (let j = 0; j < S; j++) { const a = base + i * (S + 1) + j, b = a + S + 1; idx.push(a, b, a + 1, a + 1, b, b + 1); }
+  }
+  /* chin cap: closes the front of the lower jaw (its first ring is an open edge); a fan over the lower half-ring at u0, weight = jaw weight (1) */
+  { const ring = [], u = us[0], s = {}, fr0 = {}, p = {}; bm.frame(u, fr0); bm.section(u, s); const rimA = Math.asin(jawEdgeVert(bm, u)), M = 12;
+    for (let j = 0; j <= M; j++) { const a = H.lerp(-Math.PI - rimA, rimA, j / M); bm.point(u, a, p, fr0, s, true); const l = Math.hypot(p.ly, p.lz) || 1, o = -inset / l; ring.push(new THREE.Vector3(p.x + fr0.nx * p.ly * o, p.y + fr0.ny * p.ly * o, p.z + p.lz * o)); }
+    const c = new THREE.Vector3(); ring.forEach(r => c.add(r)); c.multiplyScalar(1 / ring.length).add(new THREE.Vector3(fr0.tx * hl * .02, fr0.ty * hl * .02, 0));
+    const b0 = pos.length / 3; ring.forEach(r => push(r, u, 1)); const cc = push(c, u, 1); for (let j = 0; j < M; j++) idx.push(b0 + j, cc, b0 + j + 1); }
   const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); geo.setAttribute('aBody', new THREE.Float32BufferAttribute(ab, 4)); geo.setIndex(idx); geo.computeVertexNormals();
   const mesh = new THREE.Mesh(geo, mats.jaw); mesh.frustumCulled = false; mesh.renderOrder = 1; return [mesh];
 }
