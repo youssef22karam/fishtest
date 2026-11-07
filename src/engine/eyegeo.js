@@ -126,14 +126,19 @@ export function seatDelta(spec, sk) {
 }
 export function buildSkinBlend(THREE, spec, seg, sk) {
   const { center: c, R } = spec, F = eyeFrame(THREE, spec.axis, spec.forward, spec.up), { a, tu, tv } = F, TAU = Math.PI * 2;
-  const Rin = R * 1.018, rIn = Rin * Math.sin(BLEND_IN), zIn = Rin * Math.cos(BLEND_IN), W = R * BLEND_W;
+  const Rin = R * 1.0008, rIn = Rin * Math.sin(BLEND_IN), zIn = Rin * Math.cos(BLEND_IN), W = R * BLEND_W;
   const zs = (f, v) => sk.z0 + sk.gf * f + sk.gv * v - .5 * (sk.kf * f * f + sk.kv * v * v);
   const q1 = (spec.u || 0) * 977.3, q2 = q1 * 1.7 + 2.1, q3 = q1 * 2.9 + 4.4, irr = ph => 1 + .2 * Math.sin(2 * ph + q1) + .13 * Math.sin(3 * ph + q2) + .08 * Math.sin(5 * ph + q3) + .05 * Math.sin(8 * ph + q1 * 3.1);
+  const TL = Math.tan(LIMBUS), r0 = R * Math.sin(LIMBUS), zc0 = R * Math.cos(LIMBUS);   /* round 5B: tangent cone at the limbus rim — nothing of the patch may rise above it (see below) */
   let rimH = 0; const prox = [], rows = seg <= 8 ? 3 : 8, cols = seg <= 8 ? 14 : 36;
   const geo = makePart(THREE, rows, cols, true, (t, h) => {
     const phi = h * TAU, cp = Math.cos(phi), sp = Math.sin(phi), s = t, S = s * s * (3 - 2 * s), r = rIn + W * s * irr(phi), f = r * cp, v = r * sp;   /* round 3: irregular outer boundary — no perfect circle */
-    const hin = Math.max(0, zIn - zs(rIn * cp, rIn * sp)); if (t === 0) rimH = Math.max(rimH, hin);
-    const z = zs(f, v) + hin * (1 - S) * (1 - S) - BLEND_DIVE * R * S, zb = zs(f, v);   /* zb: the head-surface point beneath this vertex — its skin coordinates (pattern, countershading) are the cap's, so colour matches the skin around it */
+    const hin = Math.max(0, zIn - zs(rIn * cp, rIn * sp));
+    /* round 5B (a): the patch is skin AROUND the eye, so it may never cross the eyeball's silhouette. Any surface point P a viewer could see the cornea past satisfies P·n(q) > R for some visible cornea point q;
+       the set of points that never do is bounded, beyond the limbus rim, by the cone TANGENT to the sphere along the rim (z <= zc0 - (r - r0) tan LIMBUS). The funnel is clamped under that cone (and starts on the sphere), so the
+       iris/cornea is 100% visible from every direction that sees it at all — the patch can only hide itself under the real head skin. */
+    const zCone = zc0 - (r - r0) * TL - .0004 * R, zFree = zs(f, v) + hin * (1 - S) * (1 - S) - BLEND_DIVE * R * S, z = Math.min(zFree, zCone), zb = zs(f, v);   /* zb: the head-surface point beneath this vertex — its skin coordinates (pattern, countershading) are the cap's, so colour matches the skin around it */
+    if (t === 0) rimH = Math.max(rimH, Math.max(0, z - zs(f, v)));
     prox.push(c.x + a.x * zb + tu.x * f + tv.x * v, c.y + a.y * zb + tu.y * f + tv.y * v, c.z + a.z * zb + tu.z * f + tv.z * v);
     return { p: [c.x + a.x * z + tu.x * f + tv.x * v, c.y + a.y * z + tu.y * f + tv.y * v, c.z + a.z * z + tu.z * f + tv.z * v], e: [s, phi, 7] };
   });
