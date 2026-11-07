@@ -7,6 +7,7 @@ import { auditLaws } from './lawaudit.js';
 import { APPENDAGE_CAP, barbelLaw, lureLaw, whipLen } from './laws.js';
 import { auditHead } from './headaudit.js';
 import { OP } from './headlaw.js';
+import { auditCoherence } from './coherence.js';
 
 const EPS = 1e-6;
 export function auditAnatomy(fish, THREE) {
@@ -92,5 +93,6 @@ export function auditAnatomy(fish, THREE) {
   }
   E.push(...auditLaws(fish));
   E.push(...auditHead(fish, THREE));
+  if (detail) E.push(...auditCoherence(fish, THREE).map(v => v.code + ': ' + v.msg));   /* round 6H: laws L1–L6 (shared audit) */
   return E;
 }
