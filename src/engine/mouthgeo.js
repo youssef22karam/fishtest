@@ -145,6 +145,7 @@ function blobMesh(bm, mats, H, centre, ax, ay, az, fr, tag, wFn, rows = 8, cols 
   geo.setAttribute('aBody', new THREE.Float32BufferAttribute(ab, 4)); geo.computeVertexNormals();
   const mesh = new THREE.Mesh(geo, mats.jaw); mesh.frustumCulled = false; mesh.renderOrder = 1; return mesh;
 }
+
 /** Layered interior (visible only when the jaw opens): inner walls (the capped pocket), tongue as a floor mass, and the first gill arches hinted in shadow at the back. */
 export function buildInterior(bm, mats, H) {
   const { THREE } = H, g = bm.g, walls = buildCavity(bm, mats, H), out = [...walls]; walls.forEach(w => { w.userData.layer = "walls"; });
@@ -156,12 +157,13 @@ export function buildInterior(bm, mats, H) {
   const mid = new THREE.Vector3((lowY.x + upY.x) / 2, (lowY.y + upY.y) / 2, 0), L = bm.L;
   /* tongue: a floor mass resting on the lower jaw floor, its front following the jaw, its root fixed */
   const tc = mid.clone().addScaledVector(new THREE.Vector3(fr.nx, fr.ny, 0), -hy * .62).addScaledVector(new THREE.Vector3(fr.tx, fr.ty, 0), depth * .25);
-  out.push(Object.assign(blobMesh(bm, mats, H, tc, depth * .55 + (u1 - u0) * L * .3, hy * .42, Math.min(hw * .45, hy * 1.5 + 1e-5), fr, 1.5, (x) => Math.max(0, .5 - x * .5) * (1 - H.sstep(.2, 1, x * .5 + .5) * .4), 8, 14), { userData: { layer: 'tongue' } }));
+  out.push(Object.assign(blobMesh(bm, mats, H, tc.addScaledVector(new THREE.Vector3(fr.nx, fr.ny, 0), -hy * .12).addScaledVector(new THREE.Vector3(fr.tx, fr.ty, 0), depth * .2), depth * .55 + (u1 - u0) * L * .3, hy * .26, Math.min(hw * .45, hy * 1.5 + 1e-5), fr, 1.5, (x) => Math.max(0, .5 - x * .5) * (1 - H.sstep(.2, 1, x * .5 + .5) * .4), 8, 14), { userData: { layer: 'tongue' } }));
   /* first gill arches: thin ribs standing across the throat at the very back, hinted in shadow */
   const nA = 3 + (g.mouth.gape > .6 ? 1 : 0);
   for (let k = 0; k < nA; k++) {
     const back = depth * (.62 + .1 * k), c = mid.clone().addScaledVector(new THREE.Vector3(fr.tx, fr.ty, 0), back);
-    out.push(Object.assign(blobMesh(bm, mats, H, c, depth * .028, hy * .85, Math.min(hw * .5, hy * 1.2 + 1e-5), fr, 1.25, () => 0, 5, 10), { userData: { layer: 'arches' } }));
+    /* round 3: arches are LATERAL pairs (left / right of the aperture centre line, thin, low) — nothing stands on the vertical centre plane, so the pocket reads from the front as one continuous dark cavity */
+    for (const sd of [-1, 1]) out.push(Object.assign(blobMesh(bm, mats, H, c.clone().setZ(sd * hw * .62), depth * .028, hy * .6, Math.min(hw * .2, hy * .5 + 1e-5), fr, 1.25, () => 0, 5, 10), { userData: { layer: 'arches' } }));
   }
   return out;
 }
