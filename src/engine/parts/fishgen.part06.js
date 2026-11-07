@@ -168,7 +168,7 @@ function metrics(g) {
   finA.pelvic = f.pelvic.present ? 2 * f.pelvic.len * maxD * .2 * maxD : 0;
   finA.caudal = f.caudal.present ? f.caudal.len * f.caudal.len * f.caudal.aspect * (CAUDAL_FILL[f.caudal.type] || .6) : 0;
   const fr = {}; for (const k in finA) fr[k] = +(finA[k] / Math.max(1e-6, lat)).toFixed(3);
-  return { fineness: +g.body.fineness.toFixed(2), caudalAR: f.caudal.present ? +(f.caudal.aspect / (CAUDAL_FILL[f.caudal.type] || .6)).toFixed(2) : 0, relGape: +(g.mouth.gape * headDepth(g, bp)).toFixed(3), gapeOfHead: +g.mouth.gape.toFixed(2), finAreaFractions: fr, lateralAreaFrac: +lat.toFixed(3) };
+  return { maxD: +maxD.toFixed(5), fineness: +g.body.fineness.toFixed(2), caudalAR: f.caudal.present ? +(f.caudal.aspect / (CAUDAL_FILL[f.caudal.type] || .6)).toFixed(2) : 0, relGape: +(g.mouth.gape * headDepth(g, bp)).toFixed(3), gapeOfHead: +g.mouth.gape.toFixed(2), finAreaFractions: fr, lateralAreaFrac: +lat.toFixed(3) };
 }
 FG.bodyProfile = bodyProfile; FG.landmarks = landmarks; FG.metrics = metrics;
 

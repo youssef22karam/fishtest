@@ -41,9 +41,9 @@ RULE('caudal_proportion', 'Tail span follows the body and blends out of the pedu
   const minSpan = g.body.pedDepth * 1.18;
   clampLog(g, log, 'caudal_proportion', 'fins.caudal.span', Math.max(.45, minSpan), anatomyProfile(g).tailSpan[1]);
   if (['lunate', 'forked'].includes(g.fins.caudal.type)) clampLog(g, log, 'caudal_proportion', 'body.pedWidth', .35, 1.3);
-  if (g.fins.caudal.type === 'heterocercal') clampLog(g, log, 'caudal_proportion', 'fins.caudal.lobeAsym', .2, .85);
-  else if (g.fins.caudal.type === 'hypocercal') clampLog(g, log, 'caudal_proportion', 'fins.caudal.lobeAsym', -.7, -.15);
-  else if (!['filamentous', 'diphycercal'].includes(g.fins.caudal.type)) clampLog(g, log, 'caudal_proportion', 'fins.caudal.lobeAsym', -.12, .18);
+  if (g.fins.caudal.type === 'heterocercal') clampLog(g, log, 'caudal_proportion', 'fins.caudal.lobeAsym', .0833, 1);
+  else if (g.fins.caudal.type === 'hypocercal') clampLog(g, log, 'caudal_proportion', 'fins.caudal.lobeAsym', -.28, -.1);
+  else if (!['filamentous', 'diphycercal'].includes(g.fins.caudal.type)) clampLog(g, log, 'caudal_proportion', 'fins.caudal.lobeAsym', -.12, .12);
 });
 RULE('fin_segment_balance', 'Second dorsal does not overpower the first; finlets occupy a free segment', (g, lm, log) => {
   const a = anatomyProfile(g), d = g.fins.dorsal;

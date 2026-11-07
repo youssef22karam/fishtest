@@ -138,7 +138,8 @@ void main(){ float rayT = vFin.x, lenT = vFin.y, op = vFin2.x, memb = vFin2.y, s
   }
   float a=mix(max(.2,(op*(1.0-.3*lenT))*(0.84+.16*ray)+ray*.1),1.0,root);
   if(vSkin.z>.5) a=1.0;
-  if(vFin.w>2.5 && vFin.w<3.5){ a=max(a, mix(.9,1.0,ray)); if(rayT<.05||rayT>.97) a=1.0; }   /* side fin: ray structure + a membrane that reads as tissue, never a jelly paddle */
+  if(vFin.w>2.5 && vFin.w<3.5){ a=max(a, mix(.9,1.0,ray)); if(rayT<.05||rayT>.97) a=1.0; }
+  else if(vFin.w>.5 && vFin.w<7.5 && vSkin.z<.5){ a=max(a, mix(.86,1.0,ray)); }   /* round 3: dorsal / anal / pelvic / caudal membranes read as tissue at rest, never jelly-transparent */   /* side fin: ray structure + a membrane that reads as tissue, never a jelly paddle */
   vec3 N=normalize(vN); if(!gl_FrontFacing) N=-N;
   vec3 c=wetLight(col,N,vWP,uGloss*.38,(1.0-vSkin.z)*(1.0-root)*.6);                 /* matte / satin membrane */
   c+=col*uLightCol*pow(max(0.0,dot(-N,normalize(uLightDir))),2.0)*(1.0-vSkin.z)*(1.0-root)*.15;

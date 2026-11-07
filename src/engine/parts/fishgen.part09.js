@@ -117,7 +117,8 @@ class BodyModel {
       s.coreW = s.w; s.n = 2; s.nV = 2; s.nD = 2; return s;
     }
     const shoulder = 1 + b.shoulder * .11 * gaussf((u - this.h * .93) / (this.h * .35));
-    s.dUp = d * b.dorsalFrac; s.dDn = d * (1 - b.dorsalFrac); s.w = w * .5 * shoulder;
+    const dfr = this.law.flat || b.roll !== 0 ? b.dorsalFrac : lerp(b.dorsalFrac, .5, sstep(.62, .95, u));   /* round 3: the peduncle is centred on the body axis (profile eases to symmetric toward the tail) */
+    s.dUp = d * dfr; s.dDn = d * (1 - dfr); s.w = w * .5 * shoulder;
     s.w *= 1 + (g.head.cheek * .05 + this.cheekK) * gaussf((u - this.h * .77) / (this.h * .22));
     if (b.hump > 0) s.dUp += b.hump * this.maxD * 0.22 * gaussf((u - 0.2) / 0.11);
     s.n = lerp(b.superN, b.superNTail, sstep(0.5, 1, u)); s.nV = s.n * (1 + 3 * b.ventralFlat); s.nD = s.n * (1 + 2.5 * b.dorsalFlat);

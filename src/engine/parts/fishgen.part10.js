@@ -42,11 +42,16 @@ class FinBuilder {
   }
   build() { const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(this.pos, 3)); geo.setAttribute('aFin', new THREE.Float32BufferAttribute(this.fin, 4)); geo.setAttribute('aFin2', new THREE.Float32BufferAttribute(this.fin2, 4)); geo.setAttribute('aSkin', new THREE.Float32BufferAttribute(this.skin, 4)); geo.setAttribute('aBase', new THREE.Float32BufferAttribute(this.base, 3)); geo.setAttribute('aHinge', new THREE.Float32BufferAttribute(this.hinge, 4)); geo.setAttribute('aAxis', new THREE.Float32BufferAttribute(this.axis, 3)); geo.setIndex(this.idx); geo.computeVertexNormals(); const n = geo.getAttribute('normal'); for (const [i, x, y, z] of this.rootNormals) n.setXYZ(i, x, y, z); return geo; }
 }
+function foil_(o, fn, t) { return ['triangle', 'falcate'].includes(o.shape) ? 1 : fn(t, o.spineFrac); }
 function addRidgeFin(fb, bm, o) {
   const fr = {}, p = {}, fn = SHAPE_FN[o.shape] || SHAPE_FN.lobe, cfg = bm.g.fins[o.cfg || o.kind] || {}, solid = bm.a.solid && o.kind !== 'adipose';
+  /* round 3: realised fin height ≤ cap × L (dorsal / anal .30, accessory fins .10) and the base is buried (skin blend) by min(.02 L, half the local depth) */
+  { let hm = 0; for (let i = 0; i <= 24; i++) hm = Math.max(hm, foil_(o, fn, i / 24)); const capL = (o.kind === 'dorsal' ? TAIL.CAP.dorsalH : o.kind === 'anal' ? TAIL.CAP.analH : .1) * bm.L; if (o.height * hm > capL) o = Object.assign({}, o, { height: capL / Math.max(1e-6, hm) }); }
+  { const H = bm.finH || (bm.finH = {}); let hm = 0; for (let i = 0; i <= 24; i++) hm = Math.max(hm, foil_(o, fn, i / 24)); H[o.kind] = Math.max(H[o.kind] || 0, o.height * hm / bm.L); }
+  const sinkS = {}; bm.section((o.u0 + o.u1) / 2, sinkS); const sink = Math.min(TAIL.CAP.sink * bm.L, .5 * Math.min(sinkS.dUp, sinkS.dDn));
   const apex = cfg.apex || .36, curve = cfg.curvature || .48, rootAngle = bm.a.root * (solid ? 3.0 : 1.3), span = o.u1 - o.u0;
   const foil = ['triangle', 'falcate'].includes(o.shape), memb = o.shape === 'spines' ? (bm.a.family === 'lion' ? .25 : bm.a.family === 'rigid' && o.spineFrac > .8 ? .12 : .68) : 1;
-  return fb.add({ bm, kind: o.kind, kindId: o.kindId, R: Math.max(o.rays, o.K > 2 ? 18 : 5), physicalR: o.rays, K: o.K, flex: o.flex, opacity: o.opacity, memb, spineFrac: o.spineFrac, solid,
+  return fb.add({ bm, kind: o.kind, kindId: o.kindId, sink, R: Math.max(o.rays, o.K > 2 ? 18 : 5), physicalR: o.rays, K: o.K, flex: o.flex, opacity: o.opacity, memb, spineFrac: o.spineFrac, solid,
     blend: cfg.rootBlend || .55, thickness: bm.maxD * bm.a.root * (solid ? .22 : .13), normal: new THREE.Vector3(0, 0, 1),
     base: (t, out) => { bm.surface(lerp(o.u0, o.u1, t), o.side * Math.PI / 2, p); out.set(p.x, p.y, p.z); },
     root: (t, side, out) => { const u = lerp(o.u0, o.u1, t), th = o.side * Math.PI / 2 - side * rootAngle * Math.pow(Math.max(0, Math.sin(Math.PI * t)), .5); bm.surface(u, th, p); out.set(p.x, p.y, p.z); out.u = u; out.theta = th; },
@@ -112,54 +117,21 @@ function addPectoral(fb, bm, side, K, rays) {
     base: basePt, edge: (t, out) => tipFor(t, out, len) });
 }
 function addPelvic(fb, bm, side, K, rays) {
-  const f = bm.g.fins.pelvic, u = bm.lm.pelvicBase, p = {}, fr = {}, fused = f.shape === 'fused', len = f.len * bm.maxD * .55, spread = fused ? .16 : .48;
-  bm.frame(u, fr);
+  const f = bm.g.fins.pelvic, u = bm.lm.pelvicBase, p = {}, fr = {}, fused = f.shape === 'fused', len = f.len * bm.maxD * .55, spread = fused ? .16 : .48, sec = {};
+  bm.frame(u, fr); bm.section(u, sec);
+  /* round 3: pelvic fins stay small — never longer than the side fins of the same fish (gliding plan excepted), ≤ .20 L, base buried like the others */
+  const pecL = bm.pecInfo && bm.pecInfo[1] && bm.pecInfo[1].lenOverL ? bm.pecInfo[1].lenOverL * bm.L : 0, glide = bm.a.family === 'glider' || bm.a.family === 'ray', sink = Math.min(TAIL.CAP.sink * bm.L, .5 * sec.dDn);
+  const lenCap = Math.min(TAIL.CAP.pelvicH * bm.L / .8, glide || !pecL ? 9 : pecL * .8); const lenF = Math.min(len, lenCap); (bm.finH || (bm.finH = {})).pelvic = lenF * 1.2 / bm.L; bm.finH.pecL = pecL / bm.L;
   const rootU = t => clamp(u + t * bm.bp.maxD * .12, .02, .94), rootTh = -Math.PI / 2 + side * spread;
-  return fb.add({ bm, kind: 'pelvic', kindId: 4, R: Math.max(rays, K > 2 ? 10 : 4), K, flex: f.flex, opacity: f.opacity, memb: f.shape === 'filament' ? .32 : 1, spineFrac: 0, solid: bm.a.solid, blend: .65, thickness: bm.maxD * bm.a.root * .22, normal: new THREE.Vector3(0, 0, side),
+  return fb.add({ bm, kind: 'pelvic', kindId: 4, sink, R: Math.max(rays, K > 2 ? 10 : 4), K, flex: f.flex, opacity: f.opacity, memb: f.shape === 'filament' ? .32 : 1, spineFrac: 0, solid: bm.a.solid, blend: .65, thickness: bm.maxD * bm.a.root * .22, normal: new THREE.Vector3(0, 0, side),
     base: (t, out) => { bm.surface(rootU(t), rootTh, p); out.set(p.x, p.y, p.z); },
     root: (t, skinSide, out) => { const uu = rootU(t), theta = rootTh + skinSide * .045 * Math.sin(Math.PI * t); bm.surface(uu, theta, p); out.set(p.x, p.y, p.z); out.u = uu; out.theta = theta; },
     edge: (t, out) => {
       const v = foilOutline(t, .4, .55, .5), h = f.shape === 'filament' ? Math.pow(Math.max(0, Math.sin(Math.PI * t)), 5) : v[1];
-      bm.surface(rootU(t), rootTh, p); out.set(p.x + fr.tx * len * .8 * h, p.y - len * (bm.a.solid ? .3 : .68) * h, p.z + side * len * .6 * h);
+      bm.surface(rootU(t), rootTh, p); out.set(p.x + fr.tx * lenF * .8 * h, p.y - lenF * (bm.a.solid ? .3 : .68) * h, p.z + side * lenF * .6 * h);
     } });
 }
-function addCaudal(fb, bm, K, rays) {
-  const f = bm.g.fins.caudal, fr = {}, sec = {}, p = {}; bm.frame(.988, fr); bm.section(.988, sec);
-  const TL = bm.law.tail, HOMO_T = { lunate: .15, forked: 0, emarginate: -.1, truncate: -.2, rounded: -.35 };
-  const F = f.type in HOMO_T && TL.family === 'homocercal' ? (a, n) => LAW.homocercalOutline(a, clamp(TL.T + HOMO_T[f.type], 0, 1), n) : CAUDAL_SHAPE[f.type] || CAUDAL_SHAPE.forked;
-  const span = bm.maxD * f.span, H = span * .5, asym = f.lobeAsym, hetero = TL.family === 'heterocercal' && f.type === 'heterocercal', deflect = hetero ? asym * .62 : 0;
-  const tailY = t => { const tt = t * 2 - 1; return H * tt * (1 + (tt > 0 ? 1 : -1) * asym * .52); };
-  const trailing = t => { const tt = t * 2 - 1; let x = F(Math.abs(tt), f.notch) * (1 + asym * tt * .48); if (bm.a.family === 'lobefin' && f.type === 'diphycercal') x *= 1 + .48 * gaussf(tt / .17); return x; };
-  /* heterocercal: the rear axis deflects upward by the plan parameter; the upper lobe is built around that axis */
-  const bend = (t, x, y) => { if (!deflect || y <= 0) return [x, y]; const q = Math.pow(clamp(y / Math.max(1e-6, H * (1 + asym * .52)), 0, 1), .8) * deflect, c = Math.cos(q), sn = Math.sin(q); return [x * c - y * sn * .35, y * c + x * sn]; };
-  const leading = t => {
-    const y = tailY(t), edge = y > 0 ? sec.dUp : sec.dDn, limit = H * (1 + (y > 0 ? 1 : -1) * asym * .52);
-    const q = clamp((Math.abs(y) - edge) / Math.max(1e-6, limit - edge), 0, 1);
-    return trailing(y > 0 ? 1 : 0) * Math.pow(q, f.type === 'lunate' ? 2.7 : 2.15);
-  };
-  let coeff = 0; for (let i = 0; i < 100; i++) { const t = (i + .5) / 100; coeff += Math.max(.005, trailing(t) - leading(t)) / 100; }
-  const targetChord = span / Math.max(.1, f.aspect * coeff);
-  const chord = clamp(targetChord, bm.L * .025, f.len * bm.L * (f.type === 'filamentous' ? 1.5 : 1.3));
-  const attached = t => { const y = tailY(t); return y >= -sec.dDn && y <= sec.dUp; };
-  const root = (t, skinSide, out) => {
-    const y = tailY(t), radius = y > 0 ? sec.dUp : sec.dDn, exp = y > 0 ? sec.nD : sec.nV;
-    const th = Math.asin(Math.sign(y) * Math.pow(clamp(Math.abs(y) / Math.max(1e-8, radius), 0, 1), exp / 2));
-    const theta = skinSide > 0 ? th : Math.PI - th;
-    if (attached(t)) { bm.surface(.988, theta, p); out.set(p.x, p.y, p.z); }
-    else { const [x, yb] = bend(t, chord * leading(t), y); out.set(fr.px + fr.tx * x + fr.nx * yb, fr.py + fr.ty * x + fr.ny * yb, skinSide * bm.maxD * .002 * (1 - Math.abs(t * 2 - 1))); }
-    out.u = .988; out.theta = theta;
-  };
-  const r1 = new THREE.Vector3(), r2 = new THREE.Vector3();
-  const res = fb.add({ bm, kind: 'caudal', kindId: 5, R: Math.max(rays | 1, K > 2 ? 31 : 9), K: K > 2 ? K + 1 : K, flex: f.flex, opacity: f.opacity, memb: 1, spineFrac: 0, solid: bm.a.solid, blend: f.rootBlend,
-    thickness: bm.maxD * (bm.a.solid ? .01 : .008), normal: new THREE.Vector3(0, 0, 1), root, attached,
-    base: (t, out) => { root(t, 1, r1); root(t, -1, r2); out.copy(r1).add(r2).multiplyScalar(.5); },
-    edge: (t, out) => {
-      const [x, y] = bend(t, chord * trailing(t), tailY(t));
-      out.set(fr.px + fr.tx * x + fr.nx * y, fr.py + fr.ty * x + fr.ny * y, 0);
-    } });
-  let lo = Infinity, hi = -Infinity; for (const tp of res.tips) { const yv = (tp.x - fr.px) * fr.nx + (tp.y - fr.py) * fr.ny; lo = Math.min(lo, yv); hi = Math.max(hi, yv); }
-  const measured = hi - lo; return { span: measured, area: res.area, ar: res.area > 0 ? measured * measured / res.area : 0 };
-}
+function addCaudal(fb, bm, K, rays) { return TAIL.buildCaudal(THREE, fb, bm, K, rays); }   /* round 3: bounded tail anatomy lives in tailgeo.js */
 function mergeGeos(list) {
   const pos = [], nor = [], idx = []; let off = 0;
   for (const g of list) { const p = g.getAttribute('position'), n = g.getAttribute('normal'), ix = g.getIndex(); for (let i = 0; i < p.count; i++) { pos.push(p.getX(i), p.getY(i), p.getZ(i)); nor.push(n.getX(i), n.getY(i), n.getZ(i)); } if (ix) for (let i = 0; i < ix.count; i++) idx.push(ix.getX(i) + off); else for (let i = 0; i < p.count; i++) idx.push(i + off); off += p.count; g.dispose(); }
