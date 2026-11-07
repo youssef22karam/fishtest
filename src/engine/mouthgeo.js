@@ -82,6 +82,7 @@ export function lipPoint(bm, u, side, H, inset = 0, out = {}) {
 export function buildCavity(bm, mats, H) {
   const { THREE } = H, g = bm.g, u0 = jawU0(bm), u1 = jawU1(bm), K = 34, S = 8, N = 5, hl = bm.h * bm.L, depth = Math.min(g.mouth.cavityDepth, CAVITY_MAX) * hl;
   const inset = bm.maxD * .004, us = []; for (let i = 0; i <= K; i++) us.push(H.lerp(u0, u1, Math.pow(i / K, 1.5)));
+  const tz = centreBand(bm);
   const P = (u, side) => { const o = lipPoint(bm, u, side, H, inset, {}); return new THREE.Vector3(o.x, o.y, o.z); };
   const R = us.map(u => P(u, 1)), Lf = us.map(u => P(u, -1)), W = us.map(u => jawW(bm, u, H));
   /* rim loop: right hinge → front (upper copy), front → left hinge, then back along the lower copy */
@@ -96,7 +97,11 @@ export function buildCavity(bm, mats, H) {
   { const ut = H.clamp((u0 + u1) / 2 + depth / bm.L, .004, .999), ft = {}, st = {}; bm.frame(ut, ft); bm.section(ut, st);
     const ly = H.clamp((throat.x - ft.px) * ft.nx + (throat.y - ft.py) * ft.ny, -st.dDn * .55, st.dUp * .55); throat.set(ft.px + ft.nx * ly, ft.py + ft.ny * ly, 0); }
   const pos = [], ab = [], idx = [];
-  const push = (q, u, w) => { pos.push(q.x, q.y, q.z); ab.push(u, .5, 1, w); return pos.length / 3 - 1; };
+  /* round 4: baked interior occlusion (aBody.y): 0 at the lips, 1 at the throat; depth along the pocket and distance from the centre line both darken, so hood / floor / cheek walls share ONE tone field */
+  let fX = -1e9, zR = 1e-6; rim.forEach(r => { fX = Math.max(fX, r.p.x); zR = Math.max(zR, Math.abs(r.p.z)); });
+  const occOf = q => H.clamp(.14 + .66 * Math.pow(1 - H.clamp(Math.abs(q.z) / zR, 0, 1), 1.2) + .12 * H.clamp((fX - q.x) / Math.max(1e-6, fX - throat.x), 0, 1), 0, 1);   /* lateral term dominates: continuous across the centre strip, soft centre shadow, lighter toward the lips */
+  const tolZ = tz;   /* audit band: 0.02 × head width */
+  const push = (q, u, w) => { pos.push(q.x, q.y, q.z); ab.push(u, occOf(q), 1, w); return pos.length / 3 - 1; };
   for (let i = 0; i <= N; i++) {
     const d = i / N, e = H.smoother(d), shrink = 1 - .25 * e;
     for (let j = 0; j < Mr; j++) {
@@ -105,8 +110,10 @@ export function buildCavity(bm, mats, H) {
       push(q, r.u, r.w * Math.pow(1 - d, 1.4));
     }
   }
-  for (let i = 0; i < N; i++) for (let j = 0; j < Mr; j++) { const a = i * Mr + j, b = i * Mr + (j + 1) % Mr, c = a + Mr, d = b + Mr; idx.push(a, c, b, b, c, d); }
+  for (let i = 0; i < N; i++) for (let j = 0; j < Mr; j++) { const a = i * Mr + j, b = i * Mr + (j + 1) % Mr, c = a + Mr, d = b + Mr; if (!isSheet(pos, a, c, b, tz)) idx.push(a, c, b); if (!isSheet(pos, b, c, d, tz)) idx.push(b, c, d); }
+  const grp = [{ name: 'hood/floor rings', a: 0, b: idx.length / 3 }];   /* round 4: triangle ranges per constructor (centre-plane audit names the offender by group) */
   const centre = push(throat, u1, 0); for (let j = 0; j < Mr; j++) idx.push(N * Mr + j, centre, N * Mr + (j + 1) % Mr);
+  grp.push({ name: 'throat cap fan', a: grp[0].b, b: idx.length / 3 });
   /* cheek walls: a surface from the upper lip edge down to the lower lip edge on each flank. Interior points sit at the REST lip position pulled medially
      (z → 85 % at mid-wall), then rotate by a weight ramp 0→jawW, so the wall is pinned to both lips at every jaw angle and never leaves the head. */
   for (const side of [1, -1]) {
@@ -114,19 +121,32 @@ export function buildCavity(bm, mats, H) {
     for (let i = 0; i <= K; i++) for (let j = 0; j <= S; j++) {
       const f = j / S, q = arr[i].clone(); q.z *= 1 - .4 * H.sstep(0, .2, f) * H.sstep(1, .8, f) * H.sstep(0, .3, i / K + .02); push(q, us[i], W[i] * f);
     }
-    for (let i = 0; i < K; i++) for (let j = 0; j < S; j++) { const a = base + i * (S + 1) + j, b = a + S + 1; idx.push(a, b, a + 1, a + 1, b, b + 1); }
+    const t0 = idx.length / 3;
+    /* round 4: the two flanks must not leave a standing sheet on the centre plane at the very front of the aperture: triangles wholly inside the 0.02 × head-width band are dropped (the hood / floor rings close that sliver) */
+    const keep = (a, b, c) => !isSheet(pos, a, b, c, tolZ, true);
+    for (let i = 0; i < K; i++) for (let j = 0; j < S; j++) { const a = base + i * (S + 1) + j, b = a + S + 1; if (keep(a, b, a + 1)) idx.push(a, b, a + 1); if (keep(a + 1, b, b + 1)) idx.push(a + 1, b, b + 1); }
+    grp.push({ name: 'cheek wall ' + (side > 0 ? 'R' : 'L'), a: t0, b: idx.length / 3 });
   }
   /* chin cap: closes the front of the lower jaw (its first ring is an open edge); a fan over the lower half-ring at u0, weight = jaw weight (1) */
   { const ring = [], u = us[0], s = {}, fr0 = {}, p = {}; bm.frame(u, fr0); bm.section(u, s); const rimA = Math.asin(jawEdgeVert(bm, u)), M = 12;
     for (let j = 0; j <= M; j++) { const a = H.lerp(-Math.PI - rimA, rimA, j / M); bm.point(u, a, p, fr0, s, true); const l = Math.hypot(p.ly, p.lz) || 1, o = -inset / l; ring.push(new THREE.Vector3(p.x + fr0.nx * p.ly * o, p.y + fr0.ny * p.ly * o, p.z + p.lz * o)); }
-    const c = new THREE.Vector3(); ring.forEach(r => c.add(r)); c.multiplyScalar(1 / ring.length).add(new THREE.Vector3(fr0.tx * hl * .02, fr0.ty * hl * .02, 0));
+    const c = new THREE.Vector3(); ring.forEach(r => c.add(r)); c.multiplyScalar(1 / ring.length);   /* round 4: flat cap in the section plane (no forward needle) — nothing stands on the centre plane */
     /* round 2.1: the chin front is SKIN (tissue tag 0, the lower patch's own colouring), never pocket material — no pink plug, and it sits on the patch's first ring so it can never cross the lip arc */
     const b0 = pos.length / 3, sk = (q, a) => { pos.push(q.x, q.y, q.z); ab.push(u, ((a + Math.PI / 2) / H.TAU + 1) % 1, 0, 1); return pos.length / 3 - 1; };
     ring.forEach(r => sk(r, -Math.PI / 2));   /* one belly coordinate over the whole cap: no lip-crease tint across it */
-     const cc = sk(c, -Math.PI / 2); for (let j = 0; j < M; j++) idx.push(b0 + j, cc, b0 + j + 1); }
+     const cc = sk(c, -Math.PI / 2), t0 = idx.length / 3; for (let j = 0; j < M; j++) idx.push(b0 + j, cc, b0 + j + 1); grp.push({ name: 'chin cap', a: t0, b: idx.length / 3 }); }
   const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); geo.setAttribute('aBody', new THREE.Float32BufferAttribute(ab, 4)); geo.setIndex(idx); geo.computeVertexNormals();
-  const mesh = new THREE.Mesh(geo, mats.jaw); mesh.frustumCulled = false; mesh.renderOrder = 1; return [mesh];
+  const mesh = new THREE.Mesh(geo, mats.jaw); mesh.frustumCulled = false; mesh.renderOrder = 1; mesh.userData.groups = grp; geo.userData.groups = grp; return [mesh];
 }
+
+/** round 4: a triangle that would stand on the centre plane as a sheet — wholly inside the band (0.02 × head width) with its surface parallel to the plane (|nz| ≥ .5). Used by the builders to drop such slivers. */
+export function isSheet(pos, a, b, c, tol, any = false) {
+  const ax = pos[a * 3], ay = pos[a * 3 + 1], az = pos[a * 3 + 2], bx = pos[b * 3] - ax, by = pos[b * 3 + 1] - ay, bz = pos[b * 3 + 2] - az, cx = pos[c * 3] - ax, cy = pos[c * 3 + 1] - ay, cz = pos[c * 3 + 2] - az;
+  if (Math.abs(az) > tol || Math.abs(pos[b * 3 + 2]) > tol || Math.abs(pos[c * 3 + 2]) > tol) return false;
+  const nx = by * cz - bz * cy, ny = bz * cx - bx * cz, nzz = bx * cy - by * cx, l = Math.hypot(nx, ny, nzz); return any || (l > 1e-18 && Math.abs(nzz) / l >= .5);
+}
+/** round 4: the centre-plane band (0.02 × head width) shared by the builder and the audit */
+export function centreBand(bm) { let hw = 0; for (let k = 0; k <= 12; k++) { const s = {}; bm.section(bm.h * k / 12, s); hw = Math.max(hw, bm.halfWidthAtY(s, 0)); } return hw * 2 * .02; }
 
 /* keep any interior vertex inside the head section at its own station (a cavity, never a tunnel) */
 function contain(bm, q, H, slack = .9) {
@@ -142,7 +162,9 @@ function blobMesh(bm, mats, H, centre, ax, ay, az, fr, tag, wFn, rows = 8, cols 
     contain(bm, q, H); P.setXYZ(i, q.x, q.y, q.z);
     ab.push(H.clamp((bm.headX - q.x) / bm.L, .004, .999), .5, tag, wFn(x, y, z));
   }
-  geo.setAttribute('aBody', new THREE.Float32BufferAttribute(ab, 4)); geo.computeVertexNormals();
+  geo.setAttribute('aBody', new THREE.Float32BufferAttribute(ab, 4));
+  { const ix = geo.index.array, keep = [], tol = centreBand(bm); for (let t = 0; t < ix.length; t += 3) if (!isSheet(P.array, ix[t], ix[t + 1], ix[t + 2], tol, true)) keep.push(ix[t], ix[t + 1], ix[t + 2]); geo.setIndex(keep); }
+  geo.computeVertexNormals();
   const mesh = new THREE.Mesh(geo, mats.jaw); mesh.frustumCulled = false; mesh.renderOrder = 1; return mesh;
 }
 /** Layered interior (visible only when the jaw opens): inner walls (the capped pocket), tongue as a floor mass, and the first gill arches hinted in shadow at the back. */
@@ -156,7 +178,7 @@ export function buildInterior(bm, mats, H) {
   const mid = new THREE.Vector3((lowY.x + upY.x) / 2, (lowY.y + upY.y) / 2, 0), L = bm.L;
   /* tongue: a floor mass resting on the lower jaw floor, its front following the jaw, its root fixed */
   const tc = mid.clone().addScaledVector(new THREE.Vector3(fr.nx, fr.ny, 0), -hy * .62).addScaledVector(new THREE.Vector3(fr.tx, fr.ty, 0), depth * .25);
-  out.push(Object.assign(blobMesh(bm, mats, H, tc.addScaledVector(new THREE.Vector3(fr.nx, fr.ny, 0), -hy * .12).addScaledVector(new THREE.Vector3(fr.tx, fr.ty, 0), depth * .2), depth * .55 + (u1 - u0) * L * .3, hy * .26, Math.min(hw * .45, hy * 1.5 + 1e-5), fr, 1.5, (x) => Math.max(0, .5 - x * .5) * (1 - H.sstep(.2, 1, x * .5 + .5) * .4), 8, 14), { userData: { layer: 'tongue' } }));
+  out.push(Object.assign(blobMesh(bm, mats, H, tc.addScaledVector(new THREE.Vector3(fr.nx, fr.ny, 0), -hy * .12).addScaledVector(new THREE.Vector3(fr.tx, fr.ty, 0), depth * .2), Math.min(depth * .62, depth * .55 + (u1 - u0) * L * .3), hy * .26, Math.max(centreBand(bm) * 2.6, Math.min(hw * .45, hy * 1.5 + 1e-5)), fr, 1.5, (x) => Math.max(0, .5 - x * .5) * (1 - H.sstep(.2, 1, x * .5 + .5) * .4), 8, 14), { userData: { layer: 'tongue' } }));
   /* first gill arches: thin ribs standing across the throat at the very back, hinted in shadow */
   const nA = 3 + (g.mouth.gape > .6 ? 1 : 0);
   for (let k = 0; k < nA; k++) {

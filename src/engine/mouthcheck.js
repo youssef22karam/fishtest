@@ -42,3 +42,38 @@ export function round2Check(bm, ctx, rays = false) {
   }
   return errs;
 }
+
+/* ROUND 4 — CENTRE-PLANE AUDIT (front-view mouth bar). Poses every interior mesh (pocket walls, tongue, arches) at jaw = 1 exactly like the vertex shader
+   (rotation about the hinge by angle × weight + lateral splay) and tests the part of the cavity FORWARD of 60 % of its depth (front lip → throat):
+     • STANDING-SHEET offenders: a triangle that lies within 0.02 × head width of the centre plane and whose surface is parallel to it (|nz| ≥ .5, i.e. a wall of
+       material standing on the plane, seen from the front as a vertical divider) — the hard requirement, must be 0;
+     • TRANSVERSE crossings (roof / floor sheets that cross z = 0 horizontally) are counted and reported for information only: seen head-on they are the dark
+       roof and floor of ONE pocket, not a divider.
+   Returns { sheets, transverse, hw, byGroup:{name:{sheets,transverse}}, tris }. */
+export function centrePlaneAudit(bm, ctx, jawPose = 1) {
+  const { THREE, H, MOUTH, buildJawGeometry, LAW } = ctx, M = bm.law.mouth, res = { sheets: 0, transverse: 0, tris: 0, byGroup: {}, hw: 0 };
+  if (M.construction !== 'jawed' || bm.oralDisc || bm.ventralMouth) return res;
+  const jaw = buildJawGeometry(bm), piv = jaw.pivot, ang = M.openRad * jawPose, u0 = jawU0(bm), u1 = jawU1(bm), ref = jawSpreadRef(bm, H);
+  let hwMax = 0; for (let k = 0; k <= 12; k++) { const s = {}; bm.section(bm.h * k / 12, s); hwMax = Math.max(hwMax, bm.halfWidthAtY(s, 0)); }
+  const hw = res.hw = 2 * hwMax, tol = .02 * hw, meshes = MOUTH.buildInterior(bm, { jaw: null }, H);
+  let xF = -1e9, xT = 1e9;
+  for (const m of meshes) if (m.userData.layer === 'walls') { const P = m.geometry.getAttribute('position'); for (let i = 0; i < P.count; i++) { xF = Math.max(xF, P.getX(i)); xT = Math.min(xT, P.getX(i)); } }
+  const A = new THREE.Vector3(), B = new THREE.Vector3(), C = new THREE.Vector3(), n = new THREE.Vector3();
+  for (const m of meshes) {
+    const geo = m.geometry, P = geo.getAttribute('position'), W = geo.getAttribute('aBody'), I = geo.index, groups = m.userData.groups || [{ name: m.userData.layer, a: 0, b: I.count / 3 }];
+    const posed = []; for (let i = 0; i < P.count; i++) { const w = W.getW(i), a = -ang * w, c = Math.cos(a), s = Math.sin(a), dx = P.getX(i) - piv.x, dy = P.getY(i) - piv.y; posed.push(piv.x + c * dx - s * dy, piv.y + s * dx + c * dy, spreadZ(P.getZ(i), W.getX(i), w, u0, u1, ref, jawPose)); }
+    for (const g of groups) {
+      const r = res.byGroup[g.name] ||= { sheets: 0, transverse: 0, tris: 0 };
+      for (let t = g.a; t < g.b; t++) {
+        const ia = I.getX(t * 3) * 3, ib = I.getX(t * 3 + 1) * 3, ic = I.getX(t * 3 + 2) * 3;
+        A.set(posed[ia], posed[ia + 1], posed[ia + 2]); B.set(posed[ib], posed[ib + 1], posed[ib + 2]); C.set(posed[ic], posed[ic + 1], posed[ic + 2]);
+        const d = ((A.x + B.x + C.x) / 3 - 0) , df = (xF - d) / Math.max(1e-9, xF - xT); if (df >= .6) continue;
+        res.tris++; r.tris++;
+        const zmin = Math.min(A.z, B.z, C.z), zmax = Math.max(A.z, B.z, C.z); if (zmin > tol || zmax < -tol) continue;
+        n.subVectors(B, A).cross(C.clone().sub(A)); const len = n.length(); if (len < 1e-18) continue; n.multiplyScalar(1 / len);
+        if (Math.abs(n.z) >= .5 && zmin >= -tol && zmax <= tol) { res.sheets++; r.sheets++; } else if (zmin < 0 && zmax > 0) { res.transverse++; r.transverse++; }
+      }
+    }
+  }
+  return res;
+}
