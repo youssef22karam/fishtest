@@ -59,7 +59,7 @@
   lionfish: { family: 'lion', label: 'Pteroine isolated spines and fan', dorsalLimit: 1.6, traits: { 'fins.pectoral.apex': .48, 'fins.pectoral.curvature': .25, 'skin.iridescence': .08, 'fins.caudal.span': r(1, 1.3) } },
   lophiiform: { family: 'angler', label: 'Lophiiform suction head', tailSpan: [.45, 1.7], traits: { 'body.shoulder': .28, 'mouth.cornerCurve': .7, 'mouth.open': r(.1, .2), 'skin.iridescence': .015, 'fins.caudal.span': r(.6, .9) } },
   myctophid: { label: 'Myctophid photophore form', traits: { 'mouth.open': .07 } },
-    stomiid: { family: 'longjaw', label: 'Stomiid fang-bearing jaw', traits: { 'mouth.open': r(.15, .3), 'fins.caudal.span': r(1.2, 1.6) } },
+  stomiid: { family: 'longjaw', label: 'Stomiid fang-bearing jaw', traits: { 'mouth.open': r(.15, .3), 'fins.caudal.span': r(1.2, 1.6) } },
   cod: { label: 'Gadid three-dorsal body plan', locks: { 'fins.dorsal.count': 3 }, traits: { 'fins.dorsal.count': 3, 'fins.dorsal2.u1': .64, 'fins.dorsal3.u0': .72, 'fins.dorsal3.u1': .97 } },
   grenadier: { family: 'ribbon', label: 'Macrourid taper and median envelope', tailSpan: [.45, 1.1], traits: { 'fins.caudal.span': .55 } },
   snailfish: { family: 'benthic', label: 'Liparid gelatinous benthic form', tailSpan: [.55, 1.15], traits: { 'fins.caudal.span': r(.65, .85), 'skin.iridescence': .025, 'body.shoulder': .25 } },
@@ -93,8 +93,7 @@ const ECOLOGY_LIMITS = {
   shark: { bands: ['shelf', 'slope', 'meso'] }, carpetShark: { bands: ['shelf', 'slope'] }, angelShark: { bands: ['shelf', 'slope'] }, whaleShark: { bands: ['shelf', 'slope'] }, deepSeaShark: { bands: ['shelf', 'slope', 'meso', 'abyss'] },
   batoid: { bands: ['shelf', 'slope'] }, chimaera: { bands: ['shelf', 'slope', 'meso', 'abyss'] },
   cypriniform: { bands: ['shelf'] }, characin: { bands: ['shelf'], excluded: ['cold'] }, siluriform: { bands: ['shelf', 'slope'] },
-  cichlid: { bands: ['shelf'], excluded: ['cold'] }, bichir: { bands: ['shelf'], excluded: ['cold'] }, arowana: { bands: ['shelf'], excluded: ['cold'] },
-  anabantoid: { bands: ['shelf'], excluded: ['cold'] },
+  cichlid: { bands: ['shelf'], excluded: ['cold'] }, bichir: { bands: ['shelf'], excluded: ['cold'] }, arowana: { bands: ['shelf'], excluded: ['cold'] }, anabantoid: { bands: ['shelf'], excluded: ['cold'] },
   moray: { bands: ['shelf', 'slope'] }, conger: { bands: ['shelf', 'slope', 'meso'] }, freshwaterEel: { bands: ['shelf', 'slope'] }, gulper: { bands: ['meso', 'abyss'] },
   chaetodontid: { bands: ['shelf', 'slope'], excluded: ['cold'] }, damselfish: { bands: ['shelf', 'slope'], excluded: ['cold'], requireAny: ['reef', 'shallow'] }, wrasse: { bands: ['shelf', 'slope'] },
   percoid: { bands: ['shelf', 'slope'] }, tetraodontiform: { bands: ['shelf', 'slope'] }, syngnathid: { bands: ['shelf', 'slope'] }, scorpaenid: { bands: ['shelf', 'slope'] },
@@ -172,6 +171,7 @@ function metrics(g) {
   return { fineness: +g.body.fineness.toFixed(2), caudalAR: f.caudal.present ? +(f.caudal.aspect / (CAUDAL_FILL[f.caudal.type] || .6)).toFixed(2) : 0, relGape: +(g.mouth.gape * headDepth(g, bp)).toFixed(3), gapeOfHead: +g.mouth.gape.toFixed(2), finAreaFractions: fr, lateralAreaFrac: +lat.toFixed(3) };
 }
 FG.bodyProfile = bodyProfile; FG.landmarks = landmarks; FG.metrics = metrics;
+
 /* ╔══════════════════════════════════════════════════════════════════╗
    ║ 6. BIOLOGICAL RULES ENGINE (declarative table + fixed-point run) ║
    ╚══════════════════════════════════════════════════════════════════╝ */
