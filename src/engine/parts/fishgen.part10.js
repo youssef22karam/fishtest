@@ -166,15 +166,20 @@ function mergeGeos(list) {
   const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); geo.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3)); geo.setIndex(idx); return geo;
 }
 /* iris colour: the genome's palette eye colour pulled toward a metallic variant (gold / copper / olive / dark) chosen by niche + depth */
-function irisColor(g, EL) {
+function irisColor(g, EL, cart = false) {
+  /* round 2: dark, capped iris. Palette hue is kept (gold/copper hues are pulled toward brown/olive), lightness is capped below the body's mid-tone and the
+     saturation is bounded, so it never reads as bright amber / gold / yellow-orange in any plan / niche / depth. Cartilaginous plan: near-solid black. */
   const set = EL.irisSet, pick = set[cyrb128(String(g.meta.seed || 'iris') + 'iris')[0] % set.length];
-  const V = { gold: [44, .78, .50], copper: [22, .72, .40], olive: [68, .50, .34], dark: [28, .45, .13] }[pick];
-  return hslCol(g.skin.eye).lerp(hslCol(V), .7);
+  const V = { gold: [40, .5, .2], copper: [20, .5, .16], olive: [75, .35, .13], dark: [28, .35, .08] }[pick];
+  const c = hslCol(g.skin.eye).lerp(hslCol(V), .85), hsl = {}; c.getHSL(hsl, THREE.SRGBColorSpace);
+  const cap = cart ? .035 : Math.min(.2, Math.max(.07, g.skin.base[2] * .5));
+  let h = hsl.h * 360; if (h > 30 && h < 70) h = 22 + (h - 30) * .2;
+  c.setHSL(h / 360, Math.min(hsl.s, cart ? .2 : .5), Math.min(hsl.l, cap), THREE.SRGBColorSpace); return c;
 }
 function buildEyes(bm, seg, mats) {
   const g = bm.g, out = []; if (g.head.eyeSide === 'none') return out; const fr = {}, s = {}; const u = bm.lm.eye; bm.frame(u, fr); bm.section(u, s);
   const y = bm.eyeY; const list = g.head.eyeSide === 'both' ? [[1, y, u], [-1, y, u]] : g.head.eyeSide === 'left' ? [[1, y, u], [1, Math.max(-s.dDn * .5, y - bm.eyeR * 1.9), u + .018]] : [[-1, y, u], [-1, Math.max(-s.dDn * .5, y - bm.eyeR * 1.9), u + .018]];
-  const EL = bm.law.eye, ray = ['ray', 'benthicShark'].includes(bm.a.family), specs = [], opaque = [], glass = [], skin = [], infos = [];
+  const EL = bm.law.eye, ray = ['ray', 'benthicShark'].includes(bm.a.family), specs = [], opaque = [], glass = [], skin = [], infos = [], blends = [];
   for (const [side, yy, uu] of list) {
     bm.frame(uu, fr); bm.section(uu, s);
     const yn = yy > 0 ? s.nD : s.nV, yr = yy > 0 ? s.dUp : s.dDn;
@@ -185,30 +190,22 @@ function buildEyes(bm, seg, mats) {
     axis.add(new THREE.Vector3(-fr.tx * Math.max(g.head.eyeForward, EL.forwardMin) * .16, 0, 0)).normalize();
     /* seated: the sphere centre lies EYE_SEAT radii under the skin, so the dome protrudes (1 - EYE_SEAT) / 2 of the diameter */
     const center = new THREE.Vector3(surface.x, surface.y, surface.z).addScaledVector(axis, -bm.eyeR * LAW.EYE_SEAT);
+    if (bm.law.eye.placement === 'oneSide') center.z = side * Math.max(Math.abs(center.z), bm.eyeR * .06);   /* thin side-flattened head: the centre stays on its own side of the mid-plane */
     const spec = { side, center, axis, R: bm.eyeR, forward: new THREE.Vector3(-fr.tx, -fr.ty, 0), up: new THREE.Vector3(fr.nx, fr.ny, 0), u: uu, surface: new THREE.Vector3(surface.x, surface.y, surface.z) };
     specs.push(spec);
     if (EL.vestigial) { skin.push(EYE.buildVestigial(THREE, spec, seg)); infos.push({ center: center.clone(), axis: axis.clone(), R: bm.eyeR, protrusion: (1 - LAW.EYE_SEAT) / 2, vestigial: true, pupil: 'none', covers: {} }); continue; }
-    const organ = EYE.buildOrgan(THREE, spec, EL, seg); opaque.push(...organ.opaque); glass.push(...organ.glass); infos.push(organ.info);
-    if (seg > 8 && !ray) {
-      const pts = [], p = {}, section = {}, frame = {}, radius = bm.eyeR * (Math.sqrt(1 - LAW.EYE_SEAT * LAW.EYE_SEAT) + .06);
-      // The orbital edge follows the head surface instead of a floating torus.
-      for (let j = 0; j < 32; j++) {
-        const a = j / 32 * TAU, eyeU = clamp(uu + Math.cos(a) * radius / bm.L, .009, bm.h * .94);
-        bm.frame(eyeU, frame); bm.section(eyeU, section);
-        const ly = clamp(yy + Math.sin(a) * radius, -section.dDn * .9, section.dUp * .9), max = ly > 0 ? section.dUp : section.dDn, n = ly > 0 ? section.nD : section.nV;
-        const t = Math.asin(Math.sign(ly) * Math.pow(clamp(Math.abs(ly) / Math.max(max, 1e-8), 0, .95), n / 2));
-        bm.rawSurface(eyeU, side > 0 ? t : Math.PI - t, p); pts.push(new THREE.Vector3(p.x, p.y, p.z));
-      }
-      const rim = new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts, true, 'centripetal'), 32, bm.eyeR * .05, 4, true);
-      skinAttributes(rim, bm);
-      const socket = new THREE.Mesh(rim, mats.body); socket.frustumCulled = false; socket.userData.socket = true; out.push(socket);
-    }
+    /* round 2.1: no ring / socket / frame part — the head SKIN blends up onto the eyeball (eyegeo.buildSkinBlend, head skin material). Seat depth is refined against the real head surface. */
+    spec.flat = ray; spec.theta = theta; const sk = EYE.skinCurvature(THREE, bm, spec, clamp), dl = EYE.seatDelta(spec, sk); let dl2 = dl; if (dl > 0) { const c0 = spec.center.clone(); spec.center.addScaledVector(axis, -dl); if (bm.law.eye.placement === 'oneSide') spec.center.z = side * Math.max(Math.abs(spec.center.z), bm.eyeR * .06); dl2 = Math.max(0, c0.sub(spec.center).dot(axis)); sk.z0 += dl2; }
+    const organ = EYE.buildOrgan(THREE, spec, EL, seg); opaque.push(...organ.opaque); glass.push(...organ.glass); organ.info.protrusion = (1 - LAW.EYE_SEAT - dl2 / bm.eyeR) / 2; infos.push(organ.info);
+    const blend = EYE.buildSkinBlend(THREE, spec, seg, sk); infos[infos.length - 1].seatExtra = dl2 / bm.eyeR;
+    blends.push(blend); infos[infos.length - 1].rimH = blend.userData.rimH;
   }
   bm.eyes = infos;
-  const eyeCol = irisColor(g, EL);
+  const eyeCol = irisColor(g, EL, bm.a.gills === 'lateral');
   if (opaque.length) { const m = new THREE.Mesh(EYE.mergeParts(THREE, opaque), mats.eyeOrgan(false, eyeCol, specs[0].axis)); m.frustumCulled = false; m.userData.eyeball = true; m.userData.eyes = infos; out.push(m); }
   if (glass.length) { const m = new THREE.Mesh(EYE.mergeParts(THREE, glass), mats.eyeOrgan(true, eyeCol, specs[0].axis)); m.frustumCulled = false; m.renderOrder = 3; m.userData.eyeGlass = true; out.push(m); }
   if (skin.length) { const geo = mergeGeos(skin); skinAttributes(geo, bm); const m = new THREE.Mesh(geo, mats.body); m.frustumCulled = false; m.userData.eyeball = true; m.userData.eyes = infos; out.push(m); }
+  if (blends.length) { const geo = mergeGeos(blends), pg = new THREE.BufferGeometry(); pg.setAttribute('position', new THREE.Float32BufferAttribute(blends.flatMap(b => b.userData.prox), 3)); skinAttributes(pg, bm); geo.setAttribute('aBody', pg.getAttribute('aBody')); pg.dispose(); const m = new THREE.Mesh(geo, mats.body); m.frustumCulled = false; m.userData.eyeSkin = true; out.push(m); }
   return out;
 }
 function buildNostrils(bm, mats) {
@@ -225,15 +222,8 @@ function buildNostrils(bm, mats) {
   }
   const geo = mergeGeos(geos); skinAttributes(geo, bm, 6); const mesh = new THREE.Mesh(geo, mats.body); mesh.frustumCulled = false; mesh.userData.nostrils = nostrilInfo; return mesh;
 }
-function buildTeeth(bm, mats) {
-  const g = bm.g, m = g.mouth; if (m.teethCount <= 0 || m.teeth === 'none') return null; const T = TEETH[m.teeth] || TEETH.villiform, rows = bm.law.mouth.teethRows || 1; const count = Math.min(90, m.teethCount), nUp = Math.ceil(count / 2), nDn = count - nUp, hd = headDepth(g, bm.bp) * bm.L;
-  const cone = new THREE.ConeGeometry(1, 1, m.teeth === 'triangular' ? 3 : m.teeth === 'molar' || m.teeth === 'beak' ? 8 : 5, 1); cone.translate(0, 0.5, 0);
-  const inst = new THREE.InstancedMesh(cone, mats.tooth, count); const aJaw = new Float32Array(count); const fr = {}, s = {}, M = new THREE.Matrix4(), P = new THREE.Vector3(), Q = new THREE.Quaternion(), Sc = new THREE.Vector3(), up = new THREE.Vector3(0, 1, 0), D = new THREE.Vector3(); let k = 0;
-  const u0 = Math.max(bm.jawStartU, 0.03 * bm.mcU) + 0.03 * bm.mcU, u1 = 0.92 * bm.mcU;
-  for (const [n, lower] of [[nUp, 0], [nDn, 1]]) { const nn = Math.max(1, Math.ceil(n / 2)); for (let i = 0; i < n; i++) { const side = i % 2 ? 1 : -1, frac = (Math.floor(i / 2) + 0.5) / nn, row = rows > 1 && Math.floor(i / 2) % 2 ? 1 : 0, u = lerp(u0, u1, frac);   /* multiple staggered rows where the niche implies (comb / crushing classes) */ bm.frame(u, fr); bm.section(u, s); const ym = bm.mouthLineY(u, s); const len = Math.min(T.len * hd * (m.teeth === 'fang' ? 1.4 - 0.8 * frac : 1) * (1 - .15 * row), (s.dUp + s.dDn) * .3), rad = Math.min(T.r * hd, len * .45);
-    /* tooth root on the inner jaw margin: inside the local section at the root's own height */
-    const y = clamp(ym + (lower ? -.12 : .12) * len, -s.dDn * .94, s.dUp * .94), zr = bm.halfWidthAtY(s, y) * (0.66 - .16 * row), x = fr.px + fr.nx * y; P.set(x, fr.py + fr.ny * y, side * zr); D.set(fr.nx - .12, fr.ny, -side * .12).normalize().multiplyScalar(lower ? 1 : -1); Q.setFromUnitVectors(up, D); Sc.set(rad, len, m.teeth === 'triangular' ? rad * .18 : rad); M.compose(P, Q, Sc); inst.setMatrixAt(k, M); aJaw[k] = lower * (1 - sstep(Math.max(.004, bm.jawStartU) + (bm.mcU - Math.max(.004, bm.jawStartU)) * .85, bm.mcU, u)); k++; } }
-  cone.setAttribute('aJaw', new THREE.InstancedBufferAttribute(aJaw, 1)); inst.frustumCulled = false; inst.instanceMatrix.needsUpdate = true; return inst;
+function buildTeeth(bm, mats) {   /* round 2: rooted continuous rows on the lip line (teethgeo.js) */
+  const m = bm.g.mouth; if (m.teethCount <= 0 || m.teeth === 'none') return null; return TEETHGEO.buildTeethRows(bm, mats, GH, m.teeth);
 }
 /* barbels: rooted, tapered, capped strands (appendages.js); stations and lengths come from the barbel law */
 function buildBarbels(bm, mats) { return APP.buildBarbels(bm, mats, GH); }

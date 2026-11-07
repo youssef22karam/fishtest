@@ -5,7 +5,7 @@
     float t=smoothstep(uMouthStart,uMouthU,u);
     float level=mix(uMouthTipF,uMouthCornerF,t)-.025*sin(3.14159265*t);
     float fade=smoothstep(uMouthStart,uMouthStart+.012,u)*(1.0-smoothstep(uMouthU-.014,uMouthU,u));
-    float crease=exp(-pow((vert-level)/(.023+uJawAngle*.26),2.0))*fade;
+    float crease=exp(-pow((vert-level)/(.023+min(uJawAngle,.08)*.1),2.0))*fade;
     col=mix(col,uBase*.22,crease*.72);
     col=mix(col,mix(col,vec3(.62,.42,.40),.35),(exp(-pow((vert-level-.06)/.05,2.0))+exp(-pow((vert-level+.06)/.05,2.0)))*fade*uLips*.6);
   }
@@ -35,8 +35,9 @@
     vec3 mgrad=sign(det)*(dFdx(mh)*r1+dFdy(mh)*r2)*relief;
     N=normalize(max(abs(det),1e-12)*N-mgrad);
     col*=1.0+.10*clamp(mh,-1.0,1.0)*head;
-    float orb=uEyeRU>0.0 ? 1.0-smoothstep(.55,1.5,length(vec2((u-uEyeU)/max(1e-4,uEyeRU*2.1),(abs(vert)-abs(uEyeVert))/max(1e-4,uEyeRV*1.9)))) : 0.0;
-    col*=1.0-.34*orb;                                                       /* periorbital pigment ring */
+    /* round 2.1: no periorbital ring. The skin simply darkens in the last fraction before the eyeball (d ≈ distance from the eye centre in eye radii; the skin-blend cap spans d .6–1.2) */
+    float dEy=uEyeRU>0.0 ? length(vec2((u-uEyeU)/max(1e-4,uEyeRU),(abs(vert)-abs(uEyeVert))/max(1e-4,uEyeRV))) : 9.0;
+    col*=1.0-.42*(1.0-smoothstep(.62,.98,dEy));
     float behind=smoothstep(uHeadU-.001,uHeadU+.0015,u)*(1.0-smoothstep(uHeadU+.002,uHeadU+.016,u))*(1.0-skinT0(tissue));
     col*=1.0-.40*behind;                                                     /* soft shadow the free margin casts on the trunk */
     col*=1.0-.34*smoothstep(.45,1.0,rimK);                                   /* fine tapered rim of the cover */
@@ -69,7 +70,7 @@
   float coat=mix(.45,1.0,uWet)*(1.0-.25*head);
   float sss=uTrans*.9+.12;
   bool inner=tissue>.5 && tissue<2.0;
-  if(inner){ rough=.42; metal=0.0; coat=1.0; sss=.55; }
+  if(inner){ rough=.78; metal=0.0; coat=.2; sss=.3; }
   vec3 sheen=mix(uBase,vec3(.8,.88,1.0),.6)*uIrid*(.25+.75*guan);
   vec3 c=pbrSkin(col,N,vWP,rough,metal,sss,coat,sheen);
 
@@ -117,6 +118,7 @@ void main(){ vec3 p = position; vec3 n = normal; float ph = phaseOf(); p += infl
 const FS_FIN = GLSL_COMMON_FS + GLSL_PIGMENT + /* glsl */`
 uniform vec3 uFinCol; uniform float uIrid,uGloss; varying vec3 vN, vWP; varying vec4 vFin, vFin2, vSkin; varying vec2 vCirc;
 void main(){ float rayT = vFin.x, lenT = vFin.y, op = vFin2.x, memb = vFin2.y, sf = vFin2.z, R = vFin2.w;
+  if(vFin.w>2.5 && vFin.w<3.5) memb = 1.02;                                   /* round 2: a side fin keeps its membrane to the margin between the rays (no bare spikes) */
   float rl = abs(fract(rayT*(R-1.0)+0.5)-0.5); float isSpine = step(rayT, sf - 0.001); float rayW = mix(0.08, 0.16, isSpine)*(1.0-0.5*lenT); float ray = 1.0 - smoothstep(rayW, rayW+0.08, rl);
   if(vSkin.z<.5 && lenT > 1.0-.12*(4.0*rl*rl)) discard;                       /* fin law: trailing edge scalloped between ray tips */
   float branch=1.0-smoothstep(.055,.12,abs(fract(rayT*(R-1.0)*2.0+.5)-.5));
@@ -136,7 +138,7 @@ void main(){ float rayT = vFin.x, lenT = vFin.y, op = vFin2.x, memb = vFin2.y, s
   }
   float a=mix(max(.2,(op*(1.0-.3*lenT))*(0.84+.16*ray)+ray*.1),1.0,root);
   if(vSkin.z>.5) a=1.0;
-  if(vFin.w>2.5 && vFin.w<3.5){ a=max(a, mix(.58,.95,ray)); if(rayT<.05||rayT>.97) a=1.0; }   /* side fin: ray structure + a membrane that reads as tissue, never a jelly paddle */
+  if(vFin.w>2.5 && vFin.w<3.5){ a=max(a, mix(.9,1.0,ray)); if(rayT<.05||rayT>.97) a=1.0; }   /* side fin: ray structure + a membrane that reads as tissue, never a jelly paddle */
   vec3 N=normalize(vN); if(!gl_FrontFacing) N=-N;
   vec3 c=wetLight(col,N,vWP,uGloss*.38,(1.0-vSkin.z)*(1.0-root)*.6);                 /* matte / satin membrane */
   c+=col*uLightCol*pow(max(0.0,dot(-N,normalize(uLightDir))),2.0)*(1.0-vSkin.z)*(1.0-root)*.15;
@@ -159,19 +161,18 @@ void main(){
   vec3 col = vec3(.5); float alpha = 1.0, spec = 0.0, ao = 1.0;
   if(kind < .5){                                   /* sclera: pale connective tissue, vessels, darker toward the limbus */
     float th = vE.x, ph = vE.y;
-    col = mix(uEyeCol*.35, vec3(.78,.76,.70), uCartilage>.5 ? .12 : .5) * (.92+.14*vnoise(vec2(ph*3.0,uSeed)));
-    col = mix(col, vec3(.62,.26,.24), smoothstep(.55,1.0,fbm(vec2(ph*9.0, th*14.0)+uSeed))*.24);
+    col = mix(uEyeCol*.5, vec3(.07,.065,.06), .6) * (.92+.14*vnoise(vec2(ph*3.0,uSeed)));   /* round 2: dark eyeball surface, never a pale sclera ring */
     col *= mix(.48, 1.0, smoothstep(.78, 1.15, th));
   } else if(kind < 1.5){                           /* iris: textured, palette-coloured, darker limbal rim, bright pupil ruff */
     float q = vE.x, ph = vE.y;
     float fibers = .80 + .12*sin(ph*79.0+q*12.0) + .07*sin(ph*131.0-q*7.0) + .05*sin(ph*37.0+3.0);
     float crypt  = .88 + .12*vnoise(vec2(ph*14.0, q*11.0)+uSeed) + .06*fbm(vec2(ph*26.0,q*18.0));
     float collar = 1.0 + .22*(1.0-smoothstep(.0,.16,abs(q-.30)));
-    vec3 irisCol = uCartilage>.5 ? mix(uEyeCol*.95, uEyeCol*.55, q)*.8 : mix(uEyeCol*1.38, uEyeCol*.50, q*q);
+    vec3 irisCol = uCartilage>.5 ? mix(uEyeCol*.95, uEyeCol*.55, q)*.8 : mix(uEyeCol*1.0, uEyeCol*.45, q*q);
     col = irisCol*fibers*crypt*collar;
     col += uEyeCol*.45*(1.0-smoothstep(.0,.12,q));
     col *= 1.0 - .66*smoothstep(.78,1.0,q);
-    col += mix(uEyeCol,vec3(1.0),.5)*.10*pow(1.0-nv,2.0);        /* metallic sheen of the stroma */
+    col += uEyeCol*.10*pow(1.0-nv,2.0);        /* metallic sheen of the stroma */
     ao = .70 + .30*smoothstep(.0,.35,1.0-q*.5);                  /* recessed under the cornea */
   } else if(kind < 2.5){                           /* pupil cup: the dark lens, part of the eyeball itself */
     col = vec3(.004,.004,.006) + uEyeCol*.035*(1.0-vE.x); ao = .8;
@@ -180,14 +181,14 @@ void main(){
     spec = pow(max(dot(N,H),0.0), 320.0)*.9 + pow(max(dot(N,H),0.0), 40.0)*.03;
     col = vec3(1.0);
   } else if(kind < 4.5){                           /* adipose eyelid: clear fatty window, subtle */
-    col = vec3(.84,.88,.86); alpha = .16 + .30*fres;
+    col = vec3(.08); alpha = .05*fres;
   } else if(kind < 5.5){                           /* limbal funnel: dark collar leading down to the iris plane */
     col = uEyeCol*.16 + vec3(.01); ao = .75;
   } else {                                         /* nictitating lower lid: translucent milky membrane */
-    col = vec3(.74,.76,.78); alpha = .84; spec = pow(max(dot(N,H),0.0), 60.0)*.05;
+    col = vec3(.06); alpha = 0.0;
   }
   vec3 c = col*ao*(envDiff(N)*.55 + uLightCol*(.30+.70*nl) + uFillCol*.7);
-  if(kind > 2.5 && kind < 3.5){ c = uLightCol*spec + envSpec(R,.035)*fres*.45; alpha = clamp(alpha + spec*.9 + fres*.25, 0.0, 1.0); }
+  if(kind > 2.5 && kind < 3.5){ c = uLightCol*spec + envSpec(R,.035)*fres*.18; alpha = clamp(alpha + spec*.9 + fres*.10, 0.0, 1.0); }
   else c += uLightCol*spec;
   c *= .80 + .20*nv;
   float fog = fogAmt(vWP); c = mix(c, uFogCol, fog); gl_FragColor = vec4(c, alpha); }`;
@@ -195,6 +196,8 @@ const VS_SIMPLE = GLSL_SWIM + /* glsl */`
 #ifdef TEETH
 attribute float aJaw;
 varying float vT;
+uniform float uJawOpenMax;
+${JAW_SPREAD_GLSL}
 #endif
 varying vec3 vN, vWP;
 void main(){ vec3 p = position; vec3 n = normal;
@@ -205,7 +208,7 @@ void main(){ vec3 p = position; vec3 n = normal;
   p = (instanceMatrix*vec4(p,1.0)).xyz; n = normalize(mat3(instanceMatrix)*n);
 #endif
 #ifdef TEETH
-  if(aJaw > 0.0){ vec2 d = p.xy - uJawPivot; float a = -uJawAngle*aJaw; float c = cos(a), s = sin(a); p.xy = uJawPivot + vec2(c*d.x - s*d.y, s*d.x + c*d.y); n.xy=vec2(c*n.x-s*n.y,s*n.x+c*n.y); p.x += uJawProtrude*aJaw; }
+  if(aJaw > 0.0){ p = jawSpread(p, (uHeadX - p.x)/uLen, aJaw, clamp(uJawAngle/max(uJawOpenMax,1e-4),0.0,1.0)); vec2 d = p.xy - uJawPivot; float a = -uJawAngle*aJaw; float c = cos(a), s = sin(a); p.xy = uJawPivot + vec2(c*d.x - s*d.y, s*d.x + c*d.y); n.xy=vec2(c*n.x-s*n.y,s*n.x+c*n.y); p.x += uJawProtrude*aJaw; }
 #endif
   applyWave(p, n, phaseOf()); vec4 wp = modelMatrix*vec4(p,1.0); vWP = wp.xyz; vN = normalize(mat3(modelMatrix)*n); gl_Position = projectionMatrix*viewMatrix*wp; }`;
 const FS_SIMPLE = GLSL_COMMON_FS + /* glsl */`
@@ -216,11 +219,11 @@ varying float vT;
 void main(){ vec3 N = normalize(vN); if(!gl_FrontFacing) N=-N;
   vec3 col = uColor; float rough = 0.30, sss = 0.35;
 #ifdef TEETH
-  /* enamel: translucent, bluish-white at the tip, yellow dentine at the root, gum line at the base */
+  /* bone-family enamel: matte off-white, darker warm root, never emissive / pure white */
   float t = clamp(vT,0.0,1.0);
-  col = mix(mix(vec3(.74,.52,.46), vec3(.95,.92,.84), smoothstep(.05,.35,t)), vec3(.92,.95,1.0), smoothstep(.45,1.0,t));
-  col *= .95+.08*sin(t*54.0);                                    /* faint growth striae */
-  rough = mix(.34,.07,smoothstep(.2,1.0,t)); sss = .25+.75*smoothstep(.35,1.0,t);
+  col = mix(vec3(.30,.24,.19), vec3(.55,.50,.42), smoothstep(.0,.55,t));
+  col *= .96+.05*sin(t*40.0);
+  rough = .62; sss = .12;
 #endif
   vec3 c = pbrSkin(col, N, vWP, rough, 0.0, sss, 0.75, vec3(0.0));
   float fog = fogAmt(vWP); c = mix(c,uFogCol,fog); gl_FragColor = vec4(c,1.0); }`;
@@ -242,7 +245,7 @@ function makeUniforms(g, bm) {
     uSilver: { value: silver }, uEyeU: { value: lm.eye }, uEyeVert: { value: eyeVert }, uEyeRU: { value: eyeRU }, uEyeRV: { value: eyeRV },
     uLen: { value: bm.L }, uHeadX: { value: bm.headX }, uFreq: { value: g.swim.freq }, uAmp: { value: g.swim.amp }, uAmpHead: { value: g.swim.ampHead }, uEnvPow: { value: g.swim.envPow }, uWaveK: { value: g.swim.waveK }, uMode: { value: Math.max(0, SWIM_MODES.indexOf(g.swim.mode)) }, uFlap: { value: FLAP[g.swim.mode] || 0.2 }, uPecA: { value: new THREE.Vector4(0, 0, bm.law.pec.restAbd * Math.PI / 180, 0) }, uPecB: { value: new THREE.Vector4(0, 0, bm.law.pec.restAbd * Math.PI / 180, 0) }, uPecP: { value: new THREE.Vector4(0, 0, bm.law.pec.lagDeg * Math.PI / 180, bm.law.pec.restAbd * Math.PI / 180) }, uPecDisc: { value: bm.a.family === 'ray' ? 1 : 0 }, uDiscAmp: { value: 0 }, uDiscK: { value: 2 * Math.PI / .6 },
     uCycle: { value: 0 }, uFlat: { value: g.body.roll === 0 ? 0 : 1 }, uRay: { value: bm.a.family === 'ray' ? 1 : 0 }, uManta: { value: bm.ventralMouth ? 1 : 0 }, uGape: { value: g.mouth.gape }, uDetail: { value: 1 }, uCartilage: { value: bm.a.gills === 'lateral' ? 1 : 0 },
-    uBreath: { value: 0 }, uInflate: { value: 0 }, uJawAngle: { value: 0 }, uJawPivot: { value: new THREE.Vector2(bm.headX, 0) }, uJawOpenMax: { value: 0.3 }, uJawProtrude: { value: 0 }, uPhase: { value: 0 }, uBurst: { value: 0 },
+    uBreath: { value: 0 }, uInflate: { value: 0 }, uJawAngle: { value: 0 }, uJawPivot: { value: new THREE.Vector2(bm.headX, 0) }, uJawOpenMax: { value: 0.3 }, uJawSpread: { value: 0 }, uJawU0: { value: MOUTH.jawU0(bm) }, uHingeU: { value: MOUTH.jawU1(bm) }, uMLine: { value: MOUTH.edgeTable(bm, GH) }, uJawProtrude: { value: 0 }, uPhase: { value: 0 }, uBurst: { value: 0 },
     uBase: { value: hslCol(s.base) }, uBelly: { value: hslCol(s.belly) }, uAccent: { value: hslCol(s.accent) }, uFinCol: { value: hslCol(s.fin) }, uEyeCol: { value: hslCol(s.eye) }, uGlow: { value: hslCol(s.glow) }, uBand: { value: s.band }, uBandCol: { value: hslCol(s.bandColor) },
     uPattern: { value: Math.max(0, SCHEMA['skin.pattern'].opts.indexOf(s.pattern)) }, uPatScale: { value: s.patternScale }, uPatStrength: { value: s.patternStrength }, uScale: { value: Math.max(0, SCHEMA['skin.scale'].opts.indexOf(s.scale)) }, uScaleSize: { value: s.scaleSize },
     uCounter: { value: s.countershade }, uIrid: { value: s.iridescence }, uGloss: { value: s.gloss }, uPhoto: { value: s.photophores }, uTrans: { value: s.translucency }, uSlits: { value: g.head.gillSlits }, uHeadU: { value: lm.operculum }, uPreU: { value: lm.preopercle }, uMouthU: { value: lm.mouthCorner },
@@ -256,7 +259,7 @@ function makeMaterials(g, uni, school) {
   mats.fin = new THREE.ShaderMaterial({ uniforms: uni, vertexShader: VS_FIN, fragmentShader: FS_FIN, defines: Object.assign({}, defs), transparent: true, depthWrite: true, side: THREE.DoubleSide, forceSinglePass: true });
   mats.eyeOrgan = (glass, eyeCol, axis) => { const m = new THREE.ShaderMaterial({ uniforms: Object.assign({}, uni, { uEyeCol: { value: eyeCol }, uAxis: { value: axis } }), vertexShader: VS_EYE, fragmentShader: FS_EYE, defines: Object.assign({}, defs), transparent: !!glass, depthWrite: !glass, side: glass ? THREE.FrontSide : THREE.DoubleSide }); m.userData.eyeball = true; mats._eyes.push(m); return m; };
   mats.simple = new THREE.ShaderMaterial({ uniforms: uni, vertexShader: VS_SIMPLE, fragmentShader: FS_SIMPLE });
-  mats.tooth = new THREE.ShaderMaterial({ uniforms: Object.assign({}, uni, { uColor: { value: new THREE.Color(0.93, 0.9, 0.82) } }), vertexShader: VS_SIMPLE, fragmentShader: FS_SIMPLE, defines: { TEETH: 1 } });
+  mats.tooth = new THREE.ShaderMaterial({ uniforms: Object.assign({}, uni, { uColor: { value: new THREE.Color(0.66, 0.61, 0.52) } }), vertexShader: VS_SIMPLE, fragmentShader: FS_SIMPLE, defines: { TEETH: 1 } });
   mats.glow = new THREE.ShaderMaterial({ uniforms: uni, vertexShader: VS_SIMPLE, fragmentShader: FS_GLOW });
   return mats;
 }
