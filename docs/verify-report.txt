@@ -11,16 +11,16 @@
   requirement ≥ 10^9           → PASS  (10,000 fish = 10^4, a 10^30-fold undersample)
 
 [1] UNIQUENESS — 10000 seeds
-  generated 10000 (failed to resolve: 0) in 59.4 s  (5.94 ms/genome incl. gate)
-  distinct genome hashes: 10000/10000   distinct seeds: 10000   mean gate attempts/seed: 1.11
-  trait-distance on 1000 fish (499500 pairs): min=0.0565 mean=0.294  pairs under 0.02: 0
+  generated 9963 (failed to resolve: 37) in 65.6 s  (6.56 ms/genome incl. gate)
+  distinct genome hashes: 9963/10000   distinct seeds: 9963   mean gate attempts/seed: 1.11
+  trait-distance on 996 fish (495510 pairs): min=0.0565 mean=0.294  pairs under 0.02: 0
   nearest-neighbour distance: min=0.057 p10=0.081 median=0.099
-  clade mix: perch 13.8%, reef 12.2%, soft 11.2%, shark 8.4%, tuna 7.5%, eel 5.7%, cat 5.6%, deep 4.8%, box 4.5%, flat 4.3%, pike 4.1%, pipe 3.9%, cod 3.6%, angler 3.0%, scorp 2.9%, ray 2.7%, ancient 1.8%
+  clade mix: perch 13.8%, reef 12.2%, soft 11.2%, shark 8.5%, tuna 7.5%, eel 5.7%, cat 5.6%, deep 4.8%, box 4.6%, flat 4.3%, pipe 4.0%, pike 3.7%, cod 3.6%, angler 3.0%, scorp 2.9%, ray 2.7%, ancient 1.8%
   determinism (same seed → same fish): 60/60
-  UNIQUENESS RESULT: PASS
+  UNIQUENESS RESULT: FAIL
 
 [2] COHERENCE — 1000 generated fish across 17 clades (gate re-run on the stored genome + mesh audit)
-  clade coverage: perch:87 reef:91 shark:67 tuna:64 pike:61 eel:59 flat:49 pipe:53 cat:57 box:57 angler:49 deep:48 cod:44 soft:82 ray:48 ancient:43 scorp:41
+  clade coverage: perch:82 reef:81 shark:67 tuna:69 pike:50 eel:58 flat:51 pipe:52 cat:62 box:55 angler:44 deep:55 cod:46 soft:92 ray:48 ancient:42 scorp:46
   invariant                                  passed
   symmetry — bilateral symmetry (flatfish: real asymmetry only) 1000/1000
   eyes — 2 eyes, on head, embedded, 3–15% of head              1000/1000
@@ -32,33 +32,16 @@
   envelope — every axis inside its clade envelope              1000/1000
   tail — tail family by plan, outline/aspect/peduncle/keel by swim axis, lobe ratio bounds 1000/1000
   plan — flattened plan: eyes+spiracles top, mouth+5 gill pairs bottom, slender tail 1000/1000
-  mesh audit (symmetry, fin roots on skin, tri budget, 0 unrepaired rules)   875/1000
+  mesh audit (symmetry, fin roots on skin, tri budget, 0 unrepaired rules)   1000/1000
   mutate ×250: stays in envelope & valid 250/250    breed ×250: clamped & valid 250/250
-  mesh build @ gallery quality ('med'): median 22.2 ms  p95 45.0 ms  max 87.5 ms
-  gate: 11590 accepted / 4992 rejected genomes during this run
+  mesh build @ gallery quality ('med'): median 22.8 ms  p95 48.2 ms  max 80.0 ms
+  gate: 11623 accepted / 1187 rejected genomes during this run
   top rejection reasons (these were resampled, never rendered):
-    4148× coherence: EYE_SLICED: eye seat: cornea buried # R in the head surface
-    3179× coherence: EYE_OUTSIDE_HEAD: eye on the gill region (u=#, gill front #)
-    1181× mouth_gills: detached / floating tooth
-    84× coherence: EYE_SLICED: cornea #% visible (side / front#quarter)
-    31× fins: anal area # below the anguilliform envelope
-    28× fins: anal area # below the ostraciiform envelope
-    7× coherence: MOUTH_CORNER_OPEN: cheek wall has # free edges inside the head at the mouth corner (up to # head lengths deep)
+    1154× mouth_gills: detached / floating tooth
+    28× fins: anal area # below the anguilliform envelope
+    4× fins: anal area # below the ostraciiform envelope
     1× fins: anal area # below the subcarangiform envelope
-  COHERENCE RESULT: 875/1000  FAIL
-  failing examples:
-    XGR2DAMP flatfish EYE_OUTSIDE_HEAD: eye on the gill region (u=0.167, gill front 0.176)
-    M76F8KM9 boxfish EYE_OUTSIDE_HEAD: eye on the gill region (u=0.175, gill front 0.180)
-    M4D3TCW5 stingray EYE_SLICED: eye seat: cornea buried 0.20 R in the head surface
-    3EX2FFT3 pufferfish EYE_OUTSIDE_HEAD: eye on the gill region (u=0.175, gill front 0.183)
-    5C06YC1D stingray EYE_SLICED: eye seat: cornea buried 0.08 R in the head surface
-    VDXA8NXR gar 12 unrepaired constraints
-    K1F3PZ03 flatfish EYE_SLICED: cornea 92% visible (side / front-quarter)
-    FQDTCW27 pufferfish EYE_OUTSIDE_HEAD: eye on the gill region (u=0.179, gill front 0.187)
-    TE8V4V4W stingray EYE_SLICED: eye seat: cornea buried 0.19 R in the head surface
-    NYS4XSFZ pufferfish EYE_OUTSIDE_HEAD: eye on the gill region (u=0.204, gill front 0.215)
-    5G92WNM5 stingray EYE_SLICED: eye seat: cornea buried 0.15 R in the head surface
-    PA8EYXSY stingray EYE_SLICED: eye seat: cornea buried 0.12 R in the head surface | EYE_SLICED: eye seat: cornea buried 0.11 R in the head surface
+  COHERENCE RESULT: 1000/1000  PASS
 ══════════════════════════════════════════════════════════════════════════════
  OVERALL: FAIL
 ══════════════════════════════════════════════════════════════════════════════
