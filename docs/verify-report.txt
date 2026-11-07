@@ -11,7 +11,7 @@
   requirement ≥ 10^9           → PASS  (10,000 fish = 10^4, a 10^30-fold undersample)
 
 [1] UNIQUENESS — 10000 seeds
-  generated 10000 (failed to resolve: 0) in 47.9 s  (4.79 ms/genome incl. gate)
+  generated 10000 (failed to resolve: 0) in 40.9 s  (4.09 ms/genome incl. gate)
   distinct genome hashes: 10000/10000   distinct seeds: 10000   mean gate attempts/seed: 1.00
   trait-distance on 1000 fish (499500 pairs): min=0.0565 mean=0.294  pairs under 0.02: 0
   nearest-neighbour distance: min=0.057 p10=0.081 median=0.099
@@ -20,7 +20,7 @@
   UNIQUENESS RESULT: PASS
 
 [2] COHERENCE — 1000 generated fish across 17 clades (gate re-run on the stored genome + mesh audit)
-  clade coverage: perch:78 reef:86 shark:65 tuna:71 pike:57 eel:60 flat:49 pipe:50 cat:61 box:47 angler:50 deep:52 cod:51 soft:84 ray:45 ancient:46 scorp:48
+  clade coverage: perch:82 reef:88 shark:77 tuna:62 pike:57 eel:54 flat:58 pipe:49 cat:59 box:49 angler:46 deep:51 cod:54 soft:73 ray:45 ancient:47 scorp:49
   invariant                                  passed
   symmetry — bilateral symmetry (flatfish: real asymmetry only) 1000/1000
   eyes — 2 eyes, on head, embedded, 3–15% of head              1000/1000
@@ -34,11 +34,11 @@
   plan — flattened plan: eyes+spiracles top, mouth+5 gill pairs bottom, slender tail 1000/1000
   mesh audit (symmetry, fin roots on skin, tri budget, 0 unrepaired rules)   1000/1000
   mutate ×250: stays in envelope & valid 250/250    breed ×250: clamped & valid 250/250
-  mesh build @ gallery quality ('med'): median 13.5 ms  p95 22.4 ms  max 71.6 ms
+  mesh build @ gallery quality ('med'): median 11.1 ms  p95 15.5 ms  max 68.5 ms
   gate: 11620 accepted / 39 rejected genomes during this run
   top rejection reasons (these were resampled, never rendered):
-    30× fins: anal area # below the anguilliform envelope
-    8× fins: anal area # below the ostraciiform envelope
+    32× fins: anal area # below the anguilliform envelope
+    6× fins: anal area # below the ostraciiform envelope
     1× fins: anal area # below the subcarangiform envelope
   COHERENCE RESULT: 1000/1000  PASS
 ══════════════════════════════════════════════════════════════════════════════
