@@ -116,6 +116,7 @@ export function buildCavity(bm, mats, H) {
   grp.push({ name: 'throat cap fan', a: grp[0].b, b: idx.length / 3 });
   /* cheek walls: a surface from the upper lip edge down to the lower lip edge on each flank. Interior points sit at the REST lip position pulled medially
      (z → 85 % at mid-wall), then rotate by a weight ramp 0→jawW, so the wall is pinned to both lips at every jaw angle and never leaves the head. */
+  const wallRanges = [];   /* round 4.1: vertex ranges of the cheek walls (their rest shape is a collapsed sheet, so computed normals are zero-length) */
   for (const side of [1, -1]) {
     const base = pos.length / 3, arr = side > 0 ? R : Lf;
     for (let i = 0; i <= K; i++) for (let j = 0; j <= S; j++) {
@@ -125,6 +126,7 @@ export function buildCavity(bm, mats, H) {
     /* round 4: the two flanks must not leave a standing sheet on the centre plane at the very front of the aperture: triangles wholly inside the 0.02 × head-width band are dropped (the hood / floor rings close that sliver) */
     const keep = (a, b, c) => !isSheet(pos, a, b, c, tolZ, true);
     for (let i = 0; i < K; i++) for (let j = 0; j < S; j++) { const a = base + i * (S + 1) + j, b = a + S + 1; if (keep(a, b, a + 1)) idx.push(a, b, a + 1); if (keep(a + 1, b, b + 1)) idx.push(a + 1, b, b + 1); }
+    wallRanges.push([base, pos.length / 3, side]);
     grp.push({ name: 'cheek wall ' + (side > 0 ? 'R' : 'L'), a: t0, b: idx.length / 3 });
   }
   /* chin cap: closes the front of the lower jaw (its first ring is an open edge); a fan over the lower half-ring at u0, weight = jaw weight (1) */
@@ -136,6 +138,11 @@ export function buildCavity(bm, mats, H) {
     ring.forEach(r => sk(r, -Math.PI / 2));   /* one belly coordinate over the whole cap: no lip-crease tint across it */
      const cc = sk(c, -Math.PI / 2), t0 = idx.length / 3; for (let j = 0; j < M; j++) idx.push(b0 + j, cc, b0 + j + 1); grp.push({ name: 'chin cap', a: t0, b: idx.length / 3 }); }
   const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); geo.setAttribute('aBody', new THREE.Float32BufferAttribute(ab, 4)); geo.setIndex(idx); geo.computeVertexNormals();
+  /* round 4.1: at rest each cheek-wall column is a collapsed sheet (upper and lower lip points coincide), so computeVertexNormals leaves ZERO-length normals; the shader then
+     normalises 0 -> NaN and the open mouth shows black NaN patches either side of the intact centre strip (the 'divider'). Walls get their analytic medial normal (the shader flips for back faces),
+     and any other zero normal falls back to the pocket axis. Geometry, weights and the rest pose are untouched. */
+  { const nA = geo.getAttribute('normal'); for (const [a, b, sd] of wallRanges) for (let v = a; v < b; v++) nA.setXYZ(v, 0, 0, -sd);
+    for (let v = 0; v < nA.count; v++) if (Math.hypot(nA.getX(v), nA.getY(v), nA.getZ(v)) < 1e-6) nA.setXYZ(v, 0, 0, 1); nA.needsUpdate = true; }
   const mesh = new THREE.Mesh(geo, mats.jaw); mesh.frustumCulled = false; mesh.renderOrder = 1; mesh.userData.groups = grp; geo.userData.groups = grp; return [mesh];
 }
 
