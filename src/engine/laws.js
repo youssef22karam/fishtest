@@ -4,6 +4,7 @@
 
 import * as TG from './tailgeo.js';
 import { APPENDAGE_CAP, barbelLaw, barbelPlan, barbelLength, repairHead, assertHead, VENTRAL, ventralMouth } from './headlaw.js';
+import { eyeBand } from './eyeband.js';
 export { APPENDAGE_CAP, barbelLaw, barbelPlan, barbelLength };
 const clamp = (x, a, b) => x < a ? a : x > b ? b : x;
 const lerp = (a, b, t) => a + (b - a) * t;
@@ -194,7 +195,7 @@ export function repairLaws(g, ax, lm, log, H) {
   const M = mouthLaw(ax), eyeFree = !ax.plan.flat && !ax.plan.sideFlat && !ax.plan.headExpanded, er = g.head.eyeSize * EYE_GEO / 2;
   if (!M.allowedTypes.includes(g.mouth.type)) st('mouth.type', M.type);
   /* the mouth corner never extends behind the front edge of the eye (widest-gape niche: at most to the eye's centre line) */
-  const eyeCap = Math.min(.8, g.head.gillStart - er * 1.08 - .012), gMax = eyeFree ? ((eyeCap - (M.widest ? 0 : er)) - .12) / .6 : 9;
+  const eyeCap = Math.min(.8, g.head.gillStart - er * 1.08 - .012, eyeBand(h, g.head.eyeSize, g.head.eyeSide).seat), gMax = eyeFree ? ((eyeCap - (M.widest ? 0 : er)) - .12) / .6 : 9;
   const gapeHi = Math.min(M.gape[1], gMax), gapeLo = Math.min(M.gape[0], gapeLimit(g, bp, h), gapeHi);
   cl('mouth.gape', gapeLo, gapeHi);
   if (eyeFree) { const mc = h * (.12 + .6 * g.mouth.gape); cl('head.eyeU', Math.max(.15, Math.min(eyeCap, mc / h + (M.widest ? 0 : er))), .92); }
