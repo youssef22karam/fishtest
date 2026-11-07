@@ -158,7 +158,8 @@ export function mergeParts(THREE, list) { return merge(THREE, list); }
    The seat is refined against the REAL head section: sample points on the corneal cap (out to the limbus + a margin) are tested against the analytic head section (the same
    BodyModel section the loft is built from). If any would sit inside the head volume, the eyeball is lifted along its optical axis, in small steps, until none does - bounded per
    plan (protrusion never exceeds LIFT_MAX_PROTRUSION x diameter: 0.30 bony / 0.22 cartilaginous, vs the nominal 0.15), so a very curved brow or cheek can never cut the sphere. */
-export const CORNEA_REACH = LIMBUS + .04, LIFT_MAX_PROTRUSION = { bony: .30, cart: .22 };
+export const EYE_CLEAR = .75;   /* the whole eye clears the gill front: centre + .75 R (the audit's own bound is .5 R) */
+export const CORNEA_REACH = LIMBUS + .04, LIFT_MAX_PROTRUSION = { bony: .1666, cart: .1666 };
 export function corneaPoints(THREE, c, a, tu, tv, R, k = 1.012) {
   const pts = [c.clone().addScaledVector(a, R * k)];
   for (const f of [.35, .7, 1]) for (let j = 0; j < 8; j++) { const al = CORNEA_REACH * f, ph = j / 8 * Math.PI * 2, d = a.clone().multiplyScalar(Math.cos(al)).addScaledVector(tu, Math.sin(al) * Math.cos(ph)).addScaledVector(tv, Math.sin(al) * Math.sin(ph)); pts.push(c.clone().addScaledVector(d, R * k)); }
@@ -172,7 +173,6 @@ export function headDepthAt(bm, P, clamp) {
   const yR = ly > 0 ? s.dUp : s.dDn; return Math.min(dz, yR - Math.abs(ly));
 }
 export function seatLift(THREE, bm, spec, clamp, maxLift) {
-  if (spec.flat && bm.disc) return 0;
   const F = eyeFrame(THREE, spec.axis, spec.forward, spec.up), R = spec.R, c0 = spec.center.clone(), tol = .012 * R; let lift = 0;
   const worst = l => { const c = c0.clone().addScaledVector(F.a, l); let w = 0; for (const p of corneaPoints(THREE, c, F.a, F.tu, F.tv, R)) w = Math.max(w, headDepthAt(bm, p.addScaledVector(F.a, -tol), clamp)); return w; };
   for (let i = 0; i < 24 && worst(lift) > 0; i++) { lift += Math.max(.02 * R, worst(lift) * .8); if (lift >= maxLift) { lift = maxLift; break; } }

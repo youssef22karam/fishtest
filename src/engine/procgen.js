@@ -70,6 +70,8 @@ export function fromSeed(raw) {
     return v;
   };
   const v = expr(); if (i !== s.length) throw new Error('bad seed');
+  /* round 6H.1 (item 4): a genome the repair pass could not converge is never shipped - it is rejected here and randomFish / batch resample (the seed is not a valid fish) */
+  if (ENGINE && ENGINE.violations && v.genome && ENGINE.violations(v.genome).length) throw new Error('rejected seed: repair pass did not converge');
   return v;
 }
 

@@ -36,7 +36,14 @@ function eyeOutside(fish, THREE, V) {
 }
 
 /* ── L5 ── */
+/* round 6H.1 FRAME FIX (not a law/threshold change): the eye infos / cornea points are in the fish-LOCAL frame, but the ray test cast them against meshes in WORLD space. For a rolled plan
+   (group.rotation.x = body.roll, e.g. -90 for the asymmetric plan) that compared two different frames, so the visibility fraction was measured against a rotated fish. The test now runs with
+   the roll neutralised (and restored), i.e. local points against local meshes. */
 function eyeSliced(fish, THREE, V) {
+  const gr = fish.group, ro = gr.rotation.x; gr.rotation.x = 0; gr.updateMatrixWorld(true);
+  try { eyeSlicedLocal(fish, THREE, V); } finally { gr.rotation.x = ro; gr.updateMatrixWorld(true); }
+}
+function eyeSlicedLocal(fish, THREE, V) {
   const bm = fish.bm, infos = bm.eyes || [], v = m => V.push({ code: 'EYE_SLICED', msg: m }); if (fish.info.quality === 'lod') return;
   const occ = []; fish.group.traverse(m => { if (m.isMesh && !m.isInstancedMesh && (m === fish.parts.body || m.userData.eyeSkin || m === fish.parts.jaw || m === fish.parts.operculum || m === fish.parts.upperJaw)) occ.push(m); });
   fish.group.updateMatrixWorld(true);

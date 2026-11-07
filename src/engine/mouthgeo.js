@@ -110,7 +110,9 @@ export function buildCavity(bm, mats, H) {
       push(q, r.u, r.w * Math.pow(1 - d, 1.4));
     }
   }
-  for (let i = 0; i < N; i++) for (let j = 0; j < Mr; j++) { const a = i * Mr + j, b = i * Mr + (j + 1) % Mr, c = a + Mr, d = b + Mr; if (!isSheet(pos, a, c, b, tz)) idx.push(a, c, b); if (!isSheet(pos, b, c, d, tz)) idx.push(b, c, d); }
+  /* round 6H.1 (L6): the same front-only rule for the hood / floor rings - a sheet triangle is dropped only where BOTH rim stations lie in the front of the aperture; behind that every ring triangle is kept */
+  const frontRim = j => Math.max(rim[j].u, rim[(j + 1) % Mr].u) <= bm.mcU * .5;
+  for (let i = 0; i < N; i++) for (let j = 0; j < Mr; j++) { const a = i * Mr + j, b = i * Mr + (j + 1) % Mr, c = a + Mr, d = b + Mr; if (!(frontRim(j) && isSheet(pos, a, c, b, tz))) idx.push(a, c, b); if (!(frontRim(j) && isSheet(pos, b, c, d, tz))) idx.push(b, c, d); }
   const grp = [{ name: 'hood/floor rings', a: 0, b: idx.length / 3 }];   /* round 4: triangle ranges per constructor (centre-plane audit names the offender by group) */
   const centre = push(throat, u1, 0); for (let j = 0; j < Mr; j++) idx.push(N * Mr + j, centre, N * Mr + (j + 1) % Mr);
   grp.push({ name: 'throat cap fan', a: grp[0].b, b: idx.length / 3 });
@@ -124,8 +126,11 @@ export function buildCavity(bm, mats, H) {
     }
     const t0 = idx.length / 3;
     /* round 4: the two flanks must not leave a standing sheet on the centre plane at the very front of the aperture: triangles wholly inside the 0.02 × head-width band are dropped (the hood / floor rings close that sliver) */
-    const keep = (a, b, c) => !isSheet(pos, a, b, c, tolZ, true);
-    for (let i = 0; i < K; i++) for (let j = 0; j < S; j++) { const a = base + i * (S + 1) + j, b = a + S + 1; if (keep(a, b, a + 1)) idx.push(a, b, a + 1); if (keep(a + 1, b, b + 1)) idx.push(a + 1, b, b + 1); }
+    /* round 6H.1 (L6, by construction): the sliver drop is confined to the FRONT of the aperture (rows that end before .5 x the corner station, well inside the audit's front exemption of .7). The weight-ramp squeeze pulls the middle columns of a row
+       toward the centre line, so on a narrow head a row's middle triangles fell inside the band while its edge triangles did not - dropping SOME triangles of a corner-region row left free edges
+       inside the head. From the corner region back, every wall triangle is kept: the wall is closed there by construction and nothing can dangle. */
+    const frontCut = bm.mcU * .5, keep = (a, b, c, i) => us[i + 1] > frontCut || !isSheet(pos, a, b, c, tolZ, true);
+    for (let i = 0; i < K; i++) for (let j = 0; j < S; j++) { const a = base + i * (S + 1) + j, b = a + S + 1; if (keep(a, b, a + 1, i)) idx.push(a, b, a + 1); if (keep(a + 1, b, b + 1, i)) idx.push(a + 1, b, b + 1); }
     wallRanges.push([base, pos.length / 3, side]);
     grp.push({ name: 'cheek wall ' + (side > 0 ? 'R' : 'L'), a: t0, b: idx.length / 3 });
   }
