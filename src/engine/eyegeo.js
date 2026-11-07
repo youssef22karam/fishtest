@@ -137,7 +137,7 @@ export function buildSkinBlend(THREE, spec, seg, sk) {
     prox.push(c.x + a.x * zb + tu.x * f + tv.x * v, c.y + a.y * zb + tu.y * f + tv.y * v, c.z + a.z * zb + tu.z * f + tv.z * v);
     return { p: [c.x + a.x * z + tu.x * f + tv.x * v, c.y + a.y * z + tu.y * f + tv.y * v, c.z + a.z * z + tu.z * f + tv.z * v], e: [s, phi, 7] };
   });
-  geo.userData.rimH = rimH / (2 * R); geo.userData.prox = prox;
+  geo.userData.rimH = rimH / (2 * R); geo.userData.prox = prox; geo.userData.side = spec.side;
   return orient(THREE, geo, v => v.clone().sub(c));
 }
 
