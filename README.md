@@ -8,7 +8,7 @@ single file being cut off.
 ## Why it looks split
 
 The fish engine is one large ES module. In the original project it was a
-single file, `src/engine/fishgen.js` (529,101 bytes). Here it lives as 19
+single file, `src/engine/fishgen.js` (530,699 bytes). Here it lives as 19
 sequential parts:
 
 ```
@@ -30,7 +30,7 @@ src/engine/parts/fishgen.part15.js   (lines 3111–3359 of the module)
 src/engine/parts/fishgen.part16.js   (lines 3360–3582 of the module)
 src/engine/parts/fishgen.part17.js   (lines 3583–3729 of the module)
 src/engine/parts/fishgen.part18.js   (lines 3730–3964 of the module)
-src/engine/parts/fishgen.part19.js   (lines 3965–4055 of the module)
+src/engine/parts/fishgen.part19.js   (lines 3965–4070 of the module)
 ```
 
 The parts are **one continuous module in filename order** — the `import`
