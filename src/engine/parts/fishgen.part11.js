@@ -249,7 +249,7 @@ void main(){ vec3 p = position; vec3 n = normal; float ph = phaseOf();
 #endif
   applyWave(p, n, ph); mat4 mm = modelM(); vec4 wp = mm*vec4(p,1.0); vWP = wp.xyz; vLP = p; vN = normalize(mat3(mm)*n); vBody = aBody; vCirc=vec2(cos(aBody.y*6.2831853),sin(aBody.y*6.2831853)); gl_Position = projectionMatrix*viewMatrix*wp; }`;
 const FS_BODY = GLSL_COMMON_FS + GLSL_PIGMENT + /* glsl */`
-uniform float uLen,uScaleSize,uIrid,uGloss,uPhoto,uTrans,uHeadU,uPreU,uMouthU,uLateral,uElectric,uDetail,uMouthStart,uMouthTipF,uMouthCornerF,uManta,uJawAngle,uJawOpenMax,uGape;
+uniform float uLen,uScaleSize,uIrid,uGloss,uPhoto,uTrans,uHeadU,uPreU,uMouthU,uLateral,uElectric,uDetail,uMouthStart,uMouthTipF,uMouthCornerF,uManta,uJawAngle,uJawOpenMax,uGape,uJawU0,uHingeU; uniform float uMLine[40];
 uniform float uSilver,uLips,uEyeU,uEyeVert,uEyeRU,uEyeRV,uNostrils,uSlits;
 uniform int uScale; varying vec3 vN,vWP,vLP; varying vec4 vBody; varying vec2 vCirc;
 float skinT0(float t){ return (t>2.95 && t<3.3) ? 1.0 : 0.0; }
@@ -330,17 +330,14 @@ void main(){
   /* mouth law: the skin opens only as far as the jaw drops; what shows through is the capped cavity (tissue tag 1), never the far side */
   bool cav=tissue>.9&&tissue<1.1;
   if(cav){ col=vec3(.34,.12,.11)*(.5+.5*fbm(vec2(u*40.0,ang*20.0)+uSeed)); }
-#ifdef JAW
-  bool gate = tissue>1.9 && tissue<2.1;   /* the sliding upper-jaw patch opens along the same seam */
-#else
-  bool gate = skinT;
-#endif
-  {
-  if(uManta<.5 && gate && uJawOpenMax>.001 && u>=uMouthStart && u<=uMouthU*.92){
-    float k=clamp(uJawAngle/uJawOpenMax,0.0,1.0);
-    if(k>.04){ float t=smoothstep(uMouthStart,uMouthU,u); float level=mix(uMouthTipF,uMouthCornerF,t)-.025*sin(3.14159265*t);
-      float m0=max(uMouthStart,.006); float tt=clamp((u-m0)/max(1e-6,uMouthU*.92-m0),0.0,1.0); float ap=(.08+.3*uGape)*pow(max(0.0,sin(3.14159265*tt)),.6);
-      if(abs(vert-level) < ap*k) discard; } }
+#ifndef JAW
+  /* round 2: the static skin of the LOWER jaw zone (below the lip line, chin → hinge) is not drawn while the jaw is open: the hinged lower-jaw patch replaces it,
+     so nothing is ever cut out above the lip line and the upper lip is a plain skin edge. The discard line is the same table the patch edge is built from. */
+  if(uManta<.5 && tissue<.5 && uJawOpenMax>.001 && u>=uJawU0 && u<=uHingeU && uJawAngle/uJawOpenMax>.02){
+    float fi=clamp((u-uJawU0)/max(1e-6,uHingeU-uJawU0),0.0,1.0)*39.0; int i0=int(floor(fi)); int i1=min(i0+1,39);
+    float edge=mix(uMLine[i0],uMLine[i1],fi-float(i0));
+    if(vert<edge-.0005) discard;
   }
+#endif
 
   /* screen-space surface frame, reused by every bump layer */

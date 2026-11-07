@@ -263,14 +263,14 @@ function buildOperculum(bm) {
 function buildJawGeometry(bm) {
   /* lower jaw = lever hinged at the jaw joint (behind the eye line) with a visible jaw angle at its rear; upper jaw = premaxilla patch that slides forward-down with the open amount.
      Both are skin patches that are flush with the head along the seam, so at rest the lips simply meet (opening 0). */
-  const NJ = 15, M = 16, p = {}, fr = {}, s = {};
-  const u0 = Math.max(bm.jawStartU, .006), u1 = bm.hingeU || bm.mcU, cheek = bm.law.mouth.cheek;
+  const NJ = 26, M = 16, p = {}, fr = {}, s = {};
+  const u0 = MOUTH.jawU0(bm), u1 = MOUTH.jawU1(bm), cheek = bm.law.mouth.cheek;   /* round 2: same lip definition as the pocket rim, teeth rows and the skin shader */
   bm.frame(u1, fr); bm.section(u1, s);
   const py = bm.mouthLineY(u1, s), pivot = { x: fr.px + fr.nx * py, y: fr.py + fr.ny * py };
   const patch = upper => {
     const pos = [], ab = [], idx = [], uEnd = upper ? lerp(u0, bm.mcU, .8) : u1;
     for (let i = 0; i <= NJ; i++) {
-      const t = i / NJ, u = lerp(u0, uEnd, t);
+      const u = lerp(u0, uEnd, Math.pow(i / NJ, 1.5)), t = (u - u0) / Math.max(1e-9, uEnd - u0);   /* denser rows at the chin so the front profile is round */
       bm.frame(u, fr); bm.section(u, s);
       const ym = bm.mouthLineY(u, s), yr = ym > 0 ? s.dUp : s.dDn, n = ym > 0 ? s.nD : s.nV;
       const rim = Math.asin(Math.sign(ym) * Math.pow(clamp(Math.abs(ym) / Math.max(yr, 1e-8), 0, .98), n * .5));

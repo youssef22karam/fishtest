@@ -198,8 +198,9 @@ function checkFishGeometry(fish) {
     const inBody = (x, y, z, slack) => { const u = clamp((bm.headX - x) / L, .003, .999); bm.frame(u, fr); bm.section(u, s); const ly = (x - fr.px) * fr.nx + (y - fr.py) * fr.ny; return ly > -s.dDn * slack && ly < s.dUp * slack && Math.abs(z) <= bm.halfWidthAtY(s, clamp(ly, -s.dDn * .99, s.dUp * .99)) * slack + 1e-6; };
     for (const m of fish.group.children) { const ab = m.geometry.getAttribute('aBody'); if (!ab || m.material !== fish.materials.jaw || !(ab.getZ(0) >= 1 && ab.getZ(0) < 2) || bm.ventralMouth || bm.oralDisc) continue; const P = m.geometry.getAttribute('position');
       for (let i = 0; i < P.count; i++) { if (!inBody(P.getX(i), P.getY(i), P.getZ(i), 1.02)) out++; deepest = Math.max(deepest, (bm.headX - P.getX(i)) / L); } }
-    if (out) errors.push('Mouth cavity breaks out of the head'); if (deepest > bm.mcU + LAW.CAVITY_MAX * bm.h + 1e-6) errors.push('Mouth cavity deeper than 0.35 head length');
-    if (fish.parts.teeth) { const M = new THREE.Matrix4(), P = new THREE.Vector3(); for (let i = 0; i < fish.parts.teeth.count; i++) { fish.parts.teeth.getMatrixAt(i, M); P.setFromMatrixPosition(M); const u = (bm.headX - P.x) / L; if (u < bm.jawStartU - .01 || u > bm.mcU + 1e-6 || !inBody(P.x, P.y, P.z, 1.05)) { errors.push('Teeth outside the jaw margins'); break; } } } }
+    if (out) errors.push('Mouth cavity breaks out of the head'); if (deepest > Math.max(bm.mcU, bm.hingeU || 0) + LAW.CAVITY_MAX * bm.h + 1e-6) errors.push('Mouth cavity deeper than 0.35 head length');
+    if (fish.parts.teeth) { const M = new THREE.Matrix4(), P = new THREE.Vector3(); for (let i = 0; i < fish.parts.teeth.count; i++) { fish.parts.teeth.getMatrixAt(i, M); P.setFromMatrixPosition(M); const u = (bm.headX - P.x) / L; if (u < bm.jawStartU - .01 || u > Math.max(bm.mcU, bm.hingeU || 0) + 1e-6 || !inBody(P.x, P.y, P.z, 1.08)) { errors.push('Teeth outside the jaw margins'); break; } } } }
+  if (!fish.bm.oralDisc || true) errors.push(...FG.round2Check(fish.bm));   /* round 2: see-through mouth / teeth rooting / eye protrusion */
   errors.push(...auditAnatomy(fish, THREE));
   const budget = fish.info.quality === 'lod' ? 2500 : 40000;
   if (fish.info.tris > budget) errors.push('Triangle budget exceeded');

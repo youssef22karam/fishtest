@@ -5,7 +5,7 @@
 }
 FG.checkFishGeometry = checkFishGeometry; FG.TEST_STATE = TEST_STATE;
 /* close-up / test hook: scripted cameras, rest pose and held jaw (used by the render check) */
-FG.shoot = { App, setCameraView, look(pos, tgt) { camera.position.set(pos[0], pos[1], pos[2]); controls.target.set(tgt[0], tgt[1], tgt[2]); controls.update(); }, get controls() { return controls; }, rest(on) { window.__fgRest = !!on; }, jaw(v) { window.__fgJaw = v; }, fin(v) { window.__fgFin = v || null; } };
+FG.shoot = { App, setCameraView, look(pos, tgt) { camera.position.set(pos[0], pos[1], pos[2]); controls.target.set(tgt[0], tgt[1], tgt[2]); controls.update(); }, get controls() { return controls; }, rest(on) { window.__fgRest = !!on; }, jaw(v) { window.__fgJaw = v; }, fin(v) { window.__fgFin = v || null; }, get scene() { return scene; }, get camera() { return camera; }, bg(c) { scene.background = new THREE.Color(c); scene.fog = null; }, hide(names) { App.fish.group.traverse(o => { if (o.userData && o.userData.layer && names.includes(o.userData.layer)) o.visible = false; }); } };
 /* ── events & boot ── */
 /* ╔══════════════════════════════════════════════════════════════════╗
    ║ 9. HYBRID + EVOLUTION ENGINE                                     ║
