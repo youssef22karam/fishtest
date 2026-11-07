@@ -5,6 +5,8 @@ const FG_JAW_MAX = 40;
    Every rule reads only axes (plan / niche / swim / depth) and measured geometry — nothing is keyed to a named animal. */
 import { auditLaws } from './lawaudit.js';
 import { APPENDAGE_CAP, barbelLaw, lureLaw, whipLen } from './laws.js';
+import { auditHead } from './headaudit.js';
+import { OP } from './headlaw.js';
 
 const EPS = 1e-6;
 export function auditAnatomy(fish, THREE) {
@@ -77,17 +79,18 @@ export function auditAnatomy(fish, THREE) {
     if (worst > .03) err('side-silhouette step at the head–trunk junction'); if (worstW > .03) err('top-silhouette step at the head–trunk junction');
     if (detail && fish.parts.operculum && bm.loft) {
       const og = fish.parts.operculum.geometry, P = og.getAttribute('position'), A = og.getAttribute('aBody'), out = {}, ref = {}; let worstMargin = 0, worstPlate = 0, patt = 0;
-      const R = bm.loft.R, tolMargin = span * (.0012 + (1 - Math.cos(Math.PI / R)) * 1.2 + .004), tolPlate = span * (.0132 + (1 - Math.cos(Math.PI / R)) * 1.2 + .004);
+      const R = bm.loft.R, tolMargin = span * (.0012 + (1 - Math.cos(Math.PI / R)) * 1.2 + .004), tolPlate = span * (OP.height * OP.crest * 1.12 + (1 - Math.cos(Math.PI / R)) * 1.2 + .004);   /* round 5A: the plate stands proud by design; its crest is bounded, the wall's foot (tag 3.28) must lie on the trunk */
       for (let i = 0; i < P.count; i++) {
         const uu = A.getX(i), th = A.getY(i) * Math.PI * 2 - Math.PI / 2, tag = A.getZ(i);
         bm.sampleLoft(uu, th, out); const d = Math.hypot(P.getX(i) - out.x, P.getY(i) - out.y, P.getZ(i) - out.z);
         bm.sampleLoft(uu, th, ref, 'aBody'); if (A.getY(i) < 1 - 1.5 / R) { const da = Math.abs(ref.y - A.getY(i)); patt = Math.max(patt, Math.abs(ref.x - uu), da); }   /* (the loft's wrap cell is excluded: angle 1 ≡ 0) */
-        if (tag > 3.15 && tag < 3.3) worstMargin = Math.max(worstMargin, d); else worstPlate = Math.max(worstPlate, d);
+        if (tag > 3.27 && tag < 3.3) worstMargin = Math.max(worstMargin, d); else worstPlate = Math.max(worstPlate, d);
       }
       if (worstMargin > tolMargin) err('operculum free margin floats off the body'); if (worstPlate > tolPlate) err('operculum plate floats off the body'); if (patt > 1e-5) err('pattern offset across the junction');
     }
     if (detail && bm.loft && !(bm.loft.geo.getIndex().count > 0)) err('body loft missing');
   }
   E.push(...auditLaws(fish));
+  E.push(...auditHead(fish, THREE));
   return E;
 }

@@ -8,7 +8,7 @@ import { barbelPlan, barbelLength, lureLaw, whipLen } from './laws.js';
 export const STRAND_TAG = 4;
 
 /** Tapered tube through `pts` (Vector3[]), radius r(t) with t in 0..1, closed with a fine tip. aBody: root skin coordinates + t. */
-export function strandGeometry(H, pts, radius, u, ang, M = 6) {
+export function strandGeometry(H, pts, radius, u, ang, M = 6, tag = STRAND_TAG) {
   const { THREE } = H, N = pts.length - 1, pos = [], ab = [], idx = [];
   let ref = new THREE.Vector3(0, 0, 1);
   const tan = new THREE.Vector3(), nrm = new THREE.Vector3(), bin = new THREE.Vector3();
@@ -22,15 +22,15 @@ export function strandGeometry(H, pts, radius, u, ang, M = 6) {
     for (let j = 0; j < M; j++) {
       const th = j / M * H.TAU, c = Math.cos(th) * r, s = Math.sin(th) * r;
       pos.push(pts[i].x + nrm.x * c + bin.x * s, pts[i].y + nrm.y * c + bin.y * s, pts[i].z + nrm.z * c + bin.z * s);
-      ab.push(u, ang, STRAND_TAG, t);
+      ab.push(u, ang, tag, t);
     }
   }
   for (let i = 0; i < N; i++) for (let j = 0; j < M; j++) { const a = i * M + j, b = i * M + (j + 1) % M, c = a + M, d = b + M; idx.push(a, c, b, b, c, d); }
   const b0 = pos.length / 3;                                              /* closed root cap, buried in the skin */
-  pos.push(pts[0].x - (pts[1].x - pts[0].x) * .4, pts[0].y - (pts[1].y - pts[0].y) * .4, pts[0].z - (pts[1].z - pts[0].z) * .4); ab.push(u, ang, STRAND_TAG, 0);
+  pos.push(pts[0].x - (pts[1].x - pts[0].x) * .4, pts[0].y - (pts[1].y - pts[0].y) * .4, pts[0].z - (pts[1].z - pts[0].z) * .4); ab.push(u, ang, tag, 0);
   for (let j = 0; j < M; j++) idx.push(b0, (j + 1) % M, j);
   const tip = pos.length / 3, end = pts[N], prev = pts[N - 1];
-  pos.push(end.x + (end.x - prev.x) * .35, end.y + (end.y - prev.y) * .35, end.z + (end.z - prev.z) * .35); ab.push(u, ang, STRAND_TAG, 1);
+  pos.push(end.x + (end.x - prev.x) * .35, end.y + (end.y - prev.y) * .35, end.z + (end.z - prev.z) * .35); ab.push(u, ang, tag, 1);
   for (let j = 0; j < M; j++) idx.push(tip, N * M + (j + 1) % M, N * M + j);
   const geo = new THREE.BufferGeometry();
   geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); geo.setAttribute('aBody', new THREE.Float32BufferAttribute(ab, 4)); geo.setIndex(idx); geo.computeVertexNormals();
@@ -55,19 +55,19 @@ function naturalPath(H, root, d0, len, back, sweep, droop, zLock, inward, sink, 
   return pts;
 }
 
-/* ── barbels ── */
+/* ── barbels ── (round 5A) stations lie between the jaw start (snout set-back on ventral mouths) and the mouth corner, on the lip line (corner pair),
+   just below it (chin pair) or on the belly midline (the single median chin barbel). */
 function stationOf(bm, kind, side) {
-  const mc = bm.mcU, fr = {}, s = {};
-  const th = (t) => side > 0 ? t : Math.PI - t;
+  const mc = bm.mcU, j0 = Math.max(bm.jawStartU, .004), fr = {}, s = {}, th = t => side > 0 ? t : Math.PI - t;
+  const lipTheta = u => { bm.frame(u, fr); bm.section(u, s); const y = bm.mouthLineY(u, s), yr = y > 0 ? s.dUp : s.dDn, n = y > 0 ? s.nD : s.nV; return Math.asin(Math.sign(y || -1) * Math.pow(Math.min(.9, Math.abs(y) / Math.max(1e-8, yr)), n / 2)); };
   switch (kind) {
-    case 'corner': { bm.frame(mc * .97, fr); bm.section(mc * .97, s); const y = bm.mouthLineY(mc * .97, s), yr = y > 0 ? s.dUp : s.dDn, n = y > 0 ? s.nD : s.nV;
-      return { u: mc * .97, theta: th(Math.asin(Math.sign(y || -1) * Math.pow(Math.min(.9, Math.abs(y) / Math.max(1e-8, yr)), n / 2))), flow: { out: .8, down: .3, fwd: .0 } }; }
-    case 'chinPair': return { u: mc * .55, theta: th(-1.0), flow: { out: .55, down: .6, fwd: .0 } };
-    case 'outer': return { u: mc * .8, theta: th(-.8), flow: { out: .8, down: .4, fwd: .0 } };
-    case 'nasal': return { u: Math.max(bm.jawStartU + .004, Math.min(bm.h * .14, mc * .5)), theta: th(.6), flow: { out: .5, down: .0, fwd: .15 } };
-    default: return { u: mc * .42, theta: -Math.PI / 2, flow: { out: 1, down: .2, fwd: 0 } };   /* single chin barbel on the midline */
+    case 'corner': { const u = j0 + (mc - j0) * .94; return { u, theta: th(lipTheta(u)), flow: { out: .8, down: .3, fwd: .0 } }; }
+    case 'chinPair': { const u = j0 + (mc - j0) * .5; return { u, theta: th(Math.max(-1.4, lipTheta(u) - .38)), flow: { out: .55, down: .6, fwd: .0 } }; }
+    default: return { u: j0 + (mc - j0) * .42, theta: -Math.PI / 2, flow: { out: 1, down: .2, fwd: 0 } };   /* single median chin barbel */
   }
 }
+/* jaw weight at a root station: identical to the lower-jaw patch weight, so chin roots rotate with the jaw and corner roots stay with the hinge */
+const jawW = (bm, u) => { const a = Math.max(.004, bm.jawStartU), t0 = a + (bm.mcU - a) * .85, t = Math.min(1, Math.max(0, (u - t0) / Math.max(1e-9, bm.mcU - t0))); return 1 - t * t * (3 - 2 * t); };
 export function buildBarbels(bm, mats, H) {
   const { THREE } = H, plan = barbelPlan(bm.g, bm.ax, bm.law.mouth), geos = [], info = [], headLen = bm.h * bm.L;
   bm.barbelPlan = plan;
@@ -84,9 +84,9 @@ export function buildBarbels(bm, mats, H) {
     const r0 = Math.max(len * .04, Math.min(len * .07, bm.maxD * .016)), rTip = Math.max(len * .006, bm.L * 2e-4);
     const pts = naturalPath(H, root, d0, len, back, 1.3, 1.9 + .4 * item.lenHead, zLock, nrm.clone().normalize(), Math.max(len * .1, r0 * 3));
     const ang = (((st.theta + Math.PI / 2) / H.TAU) % 1 + 1) % 1;
-    geos.push(strandGeometry(H, pts, t => rTip + (r0 - rTip) * Math.pow(1 - t, 1.5), st.u, ang, 6));
+    geos.push(strandGeometry(H, pts, t => rTip + (r0 - rTip) * Math.pow(1 - t, 1.5), st.u, ang, 6, 4 + .08 * jawW(bm, st.u)));
     const rq = {}; bm.attachedSurface(st.u, st.theta, rq);
-    info.push({ rootErr: Math.hypot(rq.x - p.x, rq.y - p.y, rq.z - p.z), kind: item.kind, side, root, len: pathLength(pts.slice(1)), tip: pts[pts.length - 1].clone(), capLen: len, seg: pts.length - 1 });
+    info.push({ path: pts.slice(1), layout: plan.layout, jw: jawW(bm, st.u), rootErr: Math.hypot(rq.x - p.x, rq.y - p.y, rq.z - p.z), kind: item.kind, side, root, len: pathLength(pts.slice(1)), tip: pts[pts.length - 1].clone(), capLen: len, seg: pts.length - 1 });
   }
   bm.appendages = Object.assign(bm.appendages || {}, { barbels: info });
   bm.barbelTip = info.length ? info[0].tip : null;

@@ -73,7 +73,7 @@ export function installProcUI(ctx) {
     const opt = (v, l, sel) => `<option value="${v}"${sel ? ' selected' : ''}>${esc(l)}</option>`;
     const rows = t ? [
       ['Length', `${fmt(t.length, 2)} m · ${t.sizeClass}`], ['Body', `${t.profile} · ${t.cross} · L/D ${fmt(t.fineness, 1)}`], ['Head / eye', `${fmt(t.headLen * 100, 0)}% of body · eye ${fmt(t.eyeSize * 100, 0)}% of head`],
-      ['Mouth', `${t.mouth} · ${t.teeth}${t.teeth === 'none' ? '' : ' ×' + t.teethCount}${t.barbels ? ' · ' + t.barbels + ' barbels' : ''}${t.special !== 'none' ? ' · ' + t.special : ''}`],
+      ['Mouth', `${t.mouth} · ${t.teeth}${t.teeth === 'none' ? '' : ' ×' + t.teethCount}${g && g.head.barbels ? (g.head.barbels === 1 ? ' · median chin barbel' : ' · ' + g.head.barbels + ' paired barbels') : ''}${t.special !== 'none' ? ' · ' + t.special : ''}`],
       ['Fins', `dorsal ×${t.dN} (${t.dShape}) · anal ${t.anal ? t.aShape : '—'} · pelvic ${t.pelvic ? t.pelPos : '—'} · caudal ${t.caudal ? t.cType : '—'}`],
       ['Skin', `${t.scale} · ${t.pattern}${t.pattern === 'none' ? '' : ' (scale ' + fmt(t.patScale, 1) + ', density ' + fmt(t.patDens, 2) + ')'} · ${t.palette}${t.photophores ? ' · ' + t.photophores + ' photophores' : ''}`],
     ].map(([k, v]) => `<tr><td class="mut">${k}</td><td>${esc(v)}</td></tr>`).join('') : '';

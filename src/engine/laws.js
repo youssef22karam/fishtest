@@ -3,6 +3,8 @@
    Nothing is keyed to a named animal. Pure JS: used by the engine rules, the geometry builders and the validator. */
 
 import * as TG from './tailgeo.js';
+import { APPENDAGE_CAP, barbelLaw, barbelPlan, barbelLength, repairHead, assertHead, VENTRAL, ventralMouth } from './headlaw.js';
+export { APPENDAGE_CAP, barbelLaw, barbelPlan, barbelLength };
 const clamp = (x, a, b) => x < a ? a : x > b ? b : x;
 const lerp = (a, b, t) => a + (b - a) * t;
 
@@ -74,10 +76,11 @@ export const TUBE_MAX = .5;        /* tube length / head length */
 export const JAW_TYPICAL = [12, 28], JAW_MAX_DEG = 40;
 export function mouthLaw(ax) {
   const construction = ax.plan.flat >= 1 ? 'ventral' : ax.plan.jawless || has(ax, 'parasite') ? 'sucker' : has(ax, 'grazer') ? 'fused' : ax.plan.tubular || has(ax, 'suction') ? 'tube' : 'jawed';
-  const orientation = ax.plan.flat >= 1 ? 'down' : has(ax, 'surfaceFeeder', 'glider') ? 'up' : has(ax, 'sifter', 'flatBenthic', 'parasite', 'bottomDweller', 'scavenger') ? 'down' : 'forward';
+  const ventral = ventralMouth(ax, construction);   /* round 5A: cartilaginous plan → inferior mouth set back under the snout */
+  const orientation = ax.plan.flat >= 1 || ventral ? 'down' : has(ax, 'surfaceFeeder', 'glider') ? 'up' : has(ax, 'sifter', 'flatBenthic', 'parasite', 'bottomDweller', 'scavenger') ? 'down' : 'forward';
   const strongDown = has(ax, 'sifter', 'flatBenthic', 'parasite');
   const type = construction === 'sucker' ? 'suction' : construction === 'fused' ? 'beak' : construction === 'tube' ? 'tube'
-    : orientation === 'up' ? 'superior' : orientation === 'down' ? (strongDown ? 'inferior' : 'subterminal') : 'terminal';
+    : orientation === 'up' ? 'superior' : orientation === 'down' ? (strongDown || ventral ? 'inferior' : 'subterminal') : 'terminal';
   let gape;
   if (construction === 'tube' || construction === 'fused') gape = [.05, .25];
   else if (construction === 'sucker') gape = [.1, .3];
@@ -86,6 +89,7 @@ export function mouthLaw(ax) {
   else if (has(ax, 'predator')) gape = [.4, .85];
   else if (has(ax, 'planktivore', 'cleaner', 'maneuverer', 'sifter')) gape = [.08, .32];
   else gape = [.18, .55];
+  if (ventral) gape = [Math.max(gape[0], VENTRAL.minGape), Math.max(gape[1], VENTRAL.minGape + .1)];
   const teethForm = construction === 'fused' ? 'beak' : construction === 'sucker' ? 'rasp' : construction === 'tube' || construction === 'ventral' && has(ax, 'filterFeeder') ? 'none'
     : has(ax, 'filterFeeder', 'planktivore') ? 'villiform' : has(ax, 'ambusher') ? (ax.dark ? 'fang' : 'needle')
     : has(ax, 'predator') ? (ax.plan.solid ? 'triangular' : 'needle') : has(ax, 'armored', 'sifter', 'scavenger', 'crevice') ? 'molar' : 'villiform';
@@ -98,7 +102,7 @@ export function mouthLaw(ax) {
   const gMid = (gape[0] + gape[1]) / 2, widest = construction === 'jawed' && has(ax, 'ambusher');
   const openDeg = construction !== 'jawed' ? 0 : widest && (ax.seedU == null ? 1 : ax.seedU) < .3 ? JAW_MAX_DEG : clamp(lerp(JAW_TYPICAL[0], JAW_TYPICAL[1], clamp((gMid - .1) / .8, 0, 1)), JAW_TYPICAL[0], JAW_TYPICAL[1]);
   const mouthWidth = construction === 'jawed' ? lerp(.25, .65, clamp((gMid - .1) / .8, 0, 1)) : null;   /* mouth width / head width */
-  return { picking, cheek, widest, openDeg, openRad: openDeg * Math.PI / 180, mouthWidth, teethRows, construction, orientation, type, gape, teethForm, teethClass, cavityMax: CAVITY_MAX, discMax: DISC_DEPTH_MAX, tubeMax: TUBE_MAX, allowedTypes: typesFor(type) };
+  return { picking, cheek, widest, openDeg, openRad: openDeg * Math.PI / 180, mouthWidth, teethRows, construction, orientation, ventral, setback: ventral ? VENTRAL.setback : 0, type, gape, teethForm, teethClass, cavityMax: CAVITY_MAX, discMax: DISC_DEPTH_MAX, tubeMax: TUBE_MAX, allowedTypes: typesFor(type) };
 }
 /* mouth types that satisfy the same orientation/construction (so authored mouths need not be rewritten when equivalent) */
 function typesFor(t) { return t === 'terminal' ? ['terminal', 'protrusible'] : t === 'inferior' ? ['inferior'] : t === 'subterminal' ? ['subterminal', 'inferior'] : [t]; }
@@ -195,6 +199,7 @@ export function repairLaws(g, ax, lm, log, H) {
   cl('mouth.gape', gapeLo, gapeHi);
   if (eyeFree) { const mc = h * (.12 + .6 * g.mouth.gape); cl('head.eyeU', Math.max(.15, Math.min(eyeCap, mc / h + (M.widest ? 0 : er))), .92); }
   cl('mouth.cavityDepth', .2, CAVITY_MAX);
+  repairHead(g, ax, M, st, cl);   /* round 5A: barbel count/layout from niche × plan */
   if (M.teethClass === 'absent') { st('mouth.teeth', 'none'); st('mouth.teethCount', 0); }
   else if (!sameClass(g.mouth.teeth, M.teethClass)) st('mouth.teeth', M.teethForm);
   if (ax.plan.flat >= 1) { st('head.spiracles', true); st('head.gillSlits', 5); }
@@ -266,6 +271,7 @@ export function assertLaws(g, ax, lm, metricsFn) {
   if (g.mouth.cavityDepth > CAVITY_MAX + 1e-6) fail('mouth_gills', 'mouth cavity deeper than 0.35 head length');
   if (M.teethClass === 'absent' ? g.mouth.teeth !== 'none' : !sameClass(g.mouth.teeth, M.teethClass)) fail('mouth_gills', `teeth '${g.mouth.teeth}' not of niche class '${M.teethClass}'`);
   if (lm.mouthCorner > h * g.head.gillStart + 1e-6) fail('mouth_gills', 'mouth corner crosses the gill opening');
+  assertHead(g, ax, M, fail);
   const Fl = finLaw(ax), mx = metricsFn(g), m = mx.finAreaFractions;
   for (const k of ['dorsal', 'anal', 'pectoral', 'pelvic', 'caudal']) if (m[k] > Fl.env[k][1] + 1e-3) fail('fins', `${k} area ${m[k]} outside the ${ax.swim} envelope`);
   for (const k of ['dorsal', 'anal', 'pectoral', 'caudal']) { if (f[k].present && m[k] < Fl.env[k][0] * .9 - 1e-3 && !((k === 'dorsal' || k === 'anal') && f[k].height * mx.maxD >= TG.CAP.dorsalH - 2e-3)) fail('fins', `${k} area ${m[k]} below the ${ax.swim} envelope`); if (Fl.stiff && f[k].present && f[k].flex > Fl.env.flexMax + 1e-6) fail('fins', `${k} not stiff enough for ${ax.swim}`); }
@@ -287,35 +293,6 @@ export function assertLaws(g, ax, lm, metricsFn) {
 }
 
 /* ───────────────────────── 6. BARBELS & FILAMENTS ───────────────────────── */
-export const APPENDAGE_CAP = { barbelHead: 1.0, barbelBody: .35, chinHead: .5, lureBody: .6, whipBody: .6, pairsMax: 4 };
-const OPEN_WATER = ['fastSwimmer', 'schooler', 'glider', 'surfaceFeeder', 'filterFeeder', 'planktivore', 'verticalMigrator', 'cleaner'];
-const BARBEL_ORDER = { down: ['corner', 'chinPair', 'nasal', 'outer'], ambush: ['nasal', 'corner', 'chinPair', 'outer'], other: ['corner', 'nasal', 'chinPair', 'outer'] };
-const BARBEL_LEN = { corner: 1, chinPair: .8, nasal: .65, outer: .7, chin: 1 };
-/** Which barbel stations a plan + niche may carry. Bottom-oriented niches get barbels; open-water niches none. */
-export function barbelLaw(ax, M) {
-  const bottom = M.orientation === 'down' || has(ax, 'bottomDweller', 'sifter', 'flatBenthic', 'scavenger', 'deepSea', 'crevice', 'nocturnal');
-  const ambush = has(ax, 'ambusher', 'lurer');
-  const open = has(ax, ...OPEN_WATER) && !bottom;
-  const eligible = M.construction === 'jawed' && !open && (bottom || ambush) && ax.plan.flat < 1 && !ax.plan.tubular && !ax.plan.jawless;
-  const maxPairs = !eligible ? 0 : ax.plan.cartilaginous ? 1 : ax.plan.elongated ? 2 : ax.plan.perch ? 1 : bottom ? 4 : 2;
-  return { eligible, bottom, ambush, maxPairs, chinAllowed: eligible && (bottom || ax.dark), order: M.orientation === 'down' ? BARBEL_ORDER.down : ambush ? BARBEL_ORDER.ambush : BARBEL_ORDER.other };
-}
-/** Effective, capped barbel set for a genome: [{ kind, paired, lenHead }] with lenHead = length / head length. Concentrated at short lengths. */
-export function barbelPlan(g, ax, M) {
-  const B = barbelLaw(ax, M), n = g.head.barbels | 0, out = [];
-  if (!B.eligible || n <= 0) return { law: B, items: out, pairs: 0, chin: false };
-  const raw = clamp(g.head.barbelLen, .05, 2), base = Math.min(APPENDAGE_CAP.barbelHead * .98, .8 * (1 - Math.exp(-1.35 * raw)));
-  const pairs = Math.min(Math.floor(n / 2), B.maxPairs, APPENDAGE_CAP.pairsMax);
-  for (let i = 0; i < pairs; i++) out.push({ kind: B.order[i], paired: true, lenHead: base * BARBEL_LEN[B.order[i]] });
-  const chin = (n % 2 === 1) && B.chinAllowed;
-  if (chin) out.push({ kind: 'chin', paired: false, lenHead: Math.min(APPENDAGE_CAP.chinHead * .98, base * .5) });
-  return { law: B, items: out, pairs, chin };
-}
-/** Absolute strand length (metres) after the hard caps: ≤ 1.0 × head length, ≤ 0.35 × body length; chin ≤ 0.5 × head length. */
-export function barbelLength(item, headLen, L) {
-  const cap = Math.min(item.kind === 'chin' ? APPENDAGE_CAP.chinHead * headLen : APPENDAGE_CAP.barbelHead * headLen, APPENDAGE_CAP.barbelBody * L);
-  return Math.min(item.lenHead * headLen, cap);
-}
 /** Head filament (lure) only in ambush / deep niches; total length (stalk + esca) ≤ 0.6 × body length, typically far less. */
 export function lureLaw(g, ax) {
   const allowed = g.head.special === 'esca' && (has(ax, 'ambusher', 'lurer') || ax.dark);
