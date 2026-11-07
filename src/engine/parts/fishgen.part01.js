@@ -11,6 +11,7 @@ import * as APP from './appendages.js';
 import * as EYE from './eyegeo.js';
 import * as PEC from './finmotion.js';
 import * as TAIL from './tailgeo.js';
+import { skinLaw } from './skinlaw.js';
 import { auditAnatomy } from './anatomycheck.js';
 
 /* ╔══════════════════════════════════════════════════════════════════╗

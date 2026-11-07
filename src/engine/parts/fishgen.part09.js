@@ -343,4 +343,3 @@ function buildGills(bm, mats) {
   const m = new THREE.Mesh(geo, mats.body); m.frustumCulled = false; return m;
 }
 /* fins: ray grid membranes merged into one geometry */
-function triArea(P, a, b, c2) { const ax = P[a * 3], ay = P[a * 3 + 1], az = P[a * 3 + 2]; const ux = P[b * 3] - ax, uy = P[b * 3 + 1] - ay, uz = P[b * 3 + 2] - az, vx = P[c2 * 3] - ax, vy = P[c2 * 3 + 1] - ay, vz = P[c2 * 3 + 2] - az; const cx = uy * vz - uz * vy, cy = uz * vx - ux * vz, cz = ux * vy - uy * vx; return 0.5 * Math.sqrt(cx * cx + cy * cy + cz * cz); }
