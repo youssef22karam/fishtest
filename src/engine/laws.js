@@ -35,13 +35,16 @@ const has = (ax, ...f) => f.some(x => ax.flags.has(x));
 /* ───────────────────────── 2. EYES ───────────────────────── */
 /* the eyeball sphere's radius is EYE_GEO × (genome eye size × head length / 2): bands are stated on the genome unit and as the true measured diameter / head length */
 export const EYE_GEO = .69 / .5;
-export const EYE_PROTRUSION_MAX = 1 / 3;   /* exposed dome height / diameter */
+export const EYE_PROTRUSION_MAX = 1 / 6 + 1e-6;   /* round 2: ≤ 1/6 of the eye diameter (flush, mostly embedded) */   /* exposed dome height / diameter */
 export function eyeLaw(ax) {
   let band, regime;
-  if (ax.lightless) { band = [.05, .06]; regime = 'vestigial'; }
-  else if (ax.dark || ax.nocturnal) { band = [.10, .15]; regime = 'enlarged'; }
-  else if (ax.light >= .8 && has(ax, 'fastSwimmer', 'schooler', 'glider')) { band = [.05, .10]; regime = 'reduced'; }
+  if (ax.lightless) { band = [.058, .06]; regime = 'vestigial'; }
+  else if (ax.dark || ax.nocturnal) { band = [.10, .145]; regime = 'enlarged'; }
+  else if (ax.light >= .8 && has(ax, 'fastSwimmer', 'schooler', 'glider')) { band = [.058, .10]; regime = 'reduced'; }
   else { band = [.06, .14]; regime = 'normal'; }
+  /* round 2: the body PLAN sets the envelope and wins over niche / depth. bony plan: diameter 0.08–0.20 × head length (bands above × EYE_GEO);
+     cartilaginous plan: 0.05–0.11 × head length, near-flush, lateral */
+  if (ax.plan.cartilaginous) { band = [.05 / EYE_GEO, .11 / EYE_GEO]; if (regime === 'vestigial') band = [.05 / EYE_GEO, .06 / EYE_GEO]; }
   const pupil = ax.lightless ? 'round' : (has(ax, 'ambusher', 'lurer') || ax.nocturnal) && ax.light >= .3 ? 'vertical' : has(ax, 'flatBenthic', 'bottomDweller') && ax.light >= .5 ? 'horizontal' : 'round';
   const placement = ax.plan.flat > 0 ? 'dorsal' : ax.plan.sideFlat ? 'oneSide' : ax.plan.headExpanded ? 'lateralExtremity' : 'lateral';
   /* covers are plan/niche features, present or absent cleanly: a clear adipose window at the fast open-water end, a nictitating lower lid on the cartilaginous (non-disc) plan */
@@ -54,11 +57,12 @@ export function eyeLaw(ax) {
   return { band, ratioBand: band.map(v => v * EYE_GEO), regime, vestigial: regime === 'vestigial', pupil, pupilId: pupil === 'vertical' ? 1 : pupil === 'horizontal' ? 2 : 0, placement, count: 2, covers: { adipose, nictitating }, irisSet, bottomOriented, forwardMin };
 }
 /* the eyeball is a sphere seated in an orbit: its centre lies EYE_SEAT radii below the skin, so the dome protrudes (1 - EYE_SEAT) / 2 diameters */
-export const EYE_SEAT = .36;
+export const EYE_SEAT = .70;
 export const EYE_PROTRUSION = (1 - EYE_SEAT) / 2;
 /** effective dorsal eye station (fraction of local half-depth): lateral default, shifted dorsal for bottom-oriented plans */
 export function eyeStation(g, E, ax) {
   if (ax.plan.flat > 0 || ax.plan.sideFlat || ax.plan.headExpanded) return g.head.eyeV;
+  if (ax.plan.cartilaginous) return clamp(g.head.eyeV, -.12, .28);   /* mid head height ± 0.15 × head depth */
   return clamp(g.head.eyeV, -.12, .42) + (E.bottomOriented ? .14 : 0);
 }
 
@@ -183,6 +187,8 @@ export function repairLaws(g, ax, lm, log, H) {
   const E = eyeLaw(ax), room = eyeRoom(g, bp, h);
   cl('head.eyeSize', Math.min(E.band[0], room), E.band[1]);
   if (ax.plan.flat > 0) cl('head.eyeV', .35, .98);
+  const cartLat = ax.plan.cartilaginous && !ax.plan.flat && !ax.plan.sideFlat && !ax.plan.headExpanded;
+
   /* mouth */
   const M = mouthLaw(ax), eyeFree = !ax.plan.flat && !ax.plan.sideFlat && !ax.plan.headExpanded, er = g.head.eyeSize * EYE_GEO / 2;
   if (!M.allowedTypes.includes(g.mouth.type)) st('mouth.type', M.type);

@@ -10,8 +10,8 @@
    Everything is built in the head's own coordinates, so the eye moves with the head and mirrors exactly between sides. */
 import { EYE_SEAT } from './laws.js';
 
-export const LIMBUS = .78;            /* polar angle (rad) of the corneal rim measured from the optical axis */
-export const IRIS_RECESS = .12;       /* iris plane depth behind the limbus plane, in eyeball radii */
+export const LIMBUS = .62;            /* polar angle (rad) of the corneal rim measured from the optical axis */
+export const IRIS_RECESS = .03;       /* iris plane depth behind the limbus plane, in eyeball radii */
 
 /** pupil half-extents (fraction of the iris radius) along the head-forward (tu) and head-up (tv) directions */
 export function pupilExtents(pupil) {
@@ -70,7 +70,7 @@ export function buildOrgan(THREE, spec, E, seg) {
   const { center: c, R } = spec, F = eyeFrame(THREE, spec.axis, spec.forward, spec.up), { a, tu, tv } = F, TAU = Math.PI * 2;
   const nP = seg <= 8 ? 8 : Math.max(12, Math.min(40, Math.round(seg * 1.6))), at = (z, r, phi) => [c.x + a.x * z + (tu.x * Math.cos(phi) + tv.x * Math.sin(phi)) * r, c.y + a.y * z + (tu.y * Math.cos(phi) + tv.y * Math.sin(phi)) * r, c.z + a.z * z + (tu.z * Math.cos(phi) + tv.z * Math.sin(phi)) * r];
   const dir = (th, phi) => { const s = Math.sin(th); return [a.x * Math.cos(th) + (tu.x * Math.cos(phi) + tv.x * Math.sin(phi)) * s, a.y * Math.cos(th) + (tu.y * Math.cos(phi) + tv.y * Math.sin(phi)) * s, a.z * Math.cos(th) + (tu.z * Math.cos(phi) + tv.z * Math.sin(phi)) * s]; };
-  const opaque = [], glass = [], zLimb = R * Math.cos(LIMBUS), rLimb = R * Math.sin(LIMBUS), zIris = zLimb - IRIS_RECESS * R, zPup = zIris - .05 * R, ext = pupilExtents(E.pupil);
+  const opaque = [], glass = [], zLimb = R * Math.cos(LIMBUS), rLimb = R * Math.sin(LIMBUS), zIris = zLimb - IRIS_RECESS * R, zPup = zIris + .004 * R, ext = pupilExtents(E.pupil);
   /* sclera: the sphere minus the corneal cap */
   opaque.push(orient(THREE, makePart(THREE, Math.max(5, Math.round(nP * .5)), nP, true, (f, h) => { const th = LIMBUS + (Math.PI - LIMBUS) * f, phi = h * TAU, d = dir(th, phi); return { p: [c.x + d[0] * R, c.y + d[1] * R, c.z + d[2] * R], n: d, e: [th, phi, 0] }; }), v => v.clone().sub(c)));
   /* limbal funnel: collar from the limbus rim down to the recessed iris plane */
@@ -79,7 +79,7 @@ export function buildOrgan(THREE, spec, E, seg) {
   /* iris: annulus between the pupil outline and the limbal radius, on the recessed plane with a shallow conical dish toward the pupil */
   opaque.push(orient(THREE, makePart(THREE, nP <= 8 ? 2 : 6, nP, true, (f, h) => { const phi = h * TAU, ri = rLimb * .985, rp = rLimb * pupilRadius(ext, phi) * .985, r = lerp(rp, ri, f), z = lerp(zPup, zIris, Math.pow(f, .6)); return { p: at(z, r, phi), e: [f, phi, 1] }; }), v => a.clone()));
   /* pupil: concave dark lens cup behind the pupil opening */
-  opaque.push(orient(THREE, makePart(THREE, nP <= 8 ? 2 : 4, nP, true, (f, h) => { const phi = h * TAU, rp = rLimb * pupilRadius(ext, phi) * .985, r = rp * (1 - f), z = zPup - .11 * R * Math.sin(f * Math.PI * .5); return { p: at(z, Math.max(r, 1e-6), phi), e: [f, phi, 2] }; }), v => a.clone()));
+  opaque.push(orient(THREE, makePart(THREE, nP <= 8 ? 2 : 4, nP, true, (f, h) => { const phi = h * TAU, rp = rLimb * pupilRadius(ext, phi) * .985, r = rp * (1 - f), z = zPup; return { p: at(z, Math.max(r, 1e-6), phi), e: [f, phi, 2] }; }), v => a.clone()));
   /* cornea: transparent dome continuing the sphere, a touch proud of it */
   glass.push(orient(THREE, makePart(THREE, Math.max(4, Math.round(nP * .3)), nP, true, (f, h) => { const th = (LIMBUS + .02) * f, phi = h * TAU, d = dir(th, phi), Rc = R * (1.012 + .012 * Math.cos(th * 1.9)); return { p: [c.x + d[0] * Rc, c.y + d[1] * Rc, c.z + d[2] * Rc], n: d, e: [th, phi, 3] }; }), v => v.clone().sub(c)));
   /* covers */
@@ -89,6 +89,56 @@ export function buildOrgan(THREE, spec, E, seg) {
   return { opaque, glass, merge: l => merge(THREE, l), info: { center: c.clone(), axis: a.clone(), R, protrusion: (R - R * EYE_SEAT) / (2 * R), pupil: E.pupil, irisRecess: IRIS_RECESS, limbus: LIMBUS, covers: Object.assign({}, E.covers) } };
 }
 function lerp(a, b, t) { return a + (b - a) * t; }
+
+
+/* ───────── ROUND 2.1: SKIN BLEND (replaces any ring / socket / frame part) ─────────
+   The head SKIN flows up onto the eyeball: a single surface of revolution about the optical axis, built from the head's own skin material (the caller gives it the body
+   material + skin attributes, so colour, pattern and pebbling are the head's). Its inner edge hugs the sphere just outside the corneal rim, so the dark sclera band is
+   covered; it then falls with a zero-slope start (smoothstep²) to the head surface and sinks slightly UNDER it, so no edge is ever visible. Heights are measured against
+   the real head surface (fitted paraboloid from rawSurface lookups), and the inner-edge height is reported as info.rimH (÷ eye diameter ≤ SKIN_RIM_MAX). */
+export const SKIN_RIM_MAX = .06;       /* rim height above the surrounding skin, × eye diameter */
+export const BLEND_IN = LIMBUS + .02, BLEND_W = .6, BLEND_DIVE = .08;   /* inner polar angle · radial width (× R) · sink below skin at the outer edge (× R) */
+/** local head-surface height field around the eye in eye-frame coordinates: zs(f,v) = z0 + gf·f + gv·v − ½(kf·f² + kv·v²)  (z along the optical axis from the sphere centre) */
+export function skinCurvature(THREE, bm, spec, clamp) {
+  const F = eyeFrame(THREE, spec.axis, spec.forward, spec.up), R = spec.R, c = spec.center, a = F.a, T = new THREE.Vector3(), p = {}, z0 = R * EYE_SEAT, fl = { z0, gf: 0, gv: 0, kf: 0, kv: 0 };
+  if (spec.flat || spec.theta === undefined) return fl;
+  const zAt = (f, v) => {
+    T.copy(c).addScaledVector(F.tu, f).addScaledVector(F.tv, v); const u = clamp((bm.headX - T.x) / bm.L, .006, .99);
+    const cost = th => { bm.rawSurface(u, th, p); const dx = p.x - T.x, dy = p.y - T.y, dz = p.z - T.z, t = dx * a.x + dy * a.y + dz * a.z; return { c: dx * dx + dy * dy + dz * dz - t * t + (Math.abs(t - z0) > R * 1.2 ? 1e3 * R * R : 0), t }; };
+    let bt = spec.theta, bc = 1e9, bz = z0, st = 2.4 / 24;
+    for (let i = 0; i <= 24; i++) { const th = spec.theta - 1.2 + i * st, r = cost(th); if (r.c < bc) { bc = r.c; bt = th; bz = r.t; } }
+    for (let it = 0; it < 3; it++) { st /= 3; for (const d of [-1, 1]) { const th = bt + d * st, r = cost(th); if (r.c < bc) { bc = r.c; bt = th; bz = r.t; } } }
+    return bz;
+  };
+  const d = R, zc = zAt(0, 0), zf1 = zAt(d, 0), zf2 = zAt(-d, 0), zv1 = zAt(0, d), zv2 = zAt(0, -d), K = .47 / R;
+  fl.z0 = zc; fl.gf = (zf1 - zf2) / (2 * d); fl.gv = (zv1 - zv2) / (2 * d);
+  fl.kf = Math.max(-K, Math.min(K, 2 * (zc - (zf1 + zf2) / 2) / (d * d))); fl.kv = Math.max(-K, Math.min(K, 2 * (zc - (zv1 + zv2) / 2) / (d * d)));
+  return fl;
+}
+/** extra seating depth δ (along −axis, ≥ 0) so the skin rim at the corneal edge stands ≤ SKIN_RIM_TARGET × diameter above the real head surface; capped so the skin never closes over the iris
+    (the skin–sphere crossing stays ≥ LIMBUS + .04 rad from the optical axis). Only ever DEEPENS the seat, so protrusion stays ≤ the law. */
+export const SKIN_RIM_TARGET = .055;
+export function seatDelta(spec, sk) {
+  const R = spec.R, Rin = R * 1.018, rIn = Rin * Math.sin(BLEND_IN), zIn = Rin * Math.cos(BLEND_IN); let hmax = 0;
+  for (let i = 0; i < 24; i++) { const ph = i / 24 * Math.PI * 2, f = rIn * Math.cos(ph), v = rIn * Math.sin(ph); hmax = Math.max(hmax, zIn - (sk.z0 + sk.gf * f + sk.gv * v - .5 * (sk.kf * f * f + sk.kv * v * v))); }
+  const cap = Math.max(0, R * Math.cos(LIMBUS + .04) - sk.z0);
+  return Math.max(0, Math.min(cap, hmax - SKIN_RIM_TARGET * 2 * R));
+}
+export function buildSkinBlend(THREE, spec, seg, sk) {
+  const { center: c, R } = spec, F = eyeFrame(THREE, spec.axis, spec.forward, spec.up), { a, tu, tv } = F, TAU = Math.PI * 2;
+  const Rin = R * 1.018, rIn = Rin * Math.sin(BLEND_IN), zIn = Rin * Math.cos(BLEND_IN), W = R * BLEND_W;
+  const zs = (f, v) => sk.z0 + sk.gf * f + sk.gv * v - .5 * (sk.kf * f * f + sk.kv * v * v);
+  let rimH = 0; const prox = [], rows = seg <= 8 ? 3 : 8, cols = seg <= 8 ? 14 : 36;
+  const geo = makePart(THREE, rows, cols, true, (t, h) => {
+    const phi = h * TAU, cp = Math.cos(phi), sp = Math.sin(phi), s = t, S = s * s * (3 - 2 * s), r = rIn + W * s, f = r * cp, v = r * sp;
+    const hin = Math.max(0, zIn - zs(rIn * cp, rIn * sp)); if (t === 0) rimH = Math.max(rimH, hin);
+    const z = zs(f, v) + hin * (1 - S) * (1 - S) - BLEND_DIVE * R * S, zb = zs(f, v);   /* zb: the head-surface point beneath this vertex — its skin coordinates (pattern, countershading) are the cap's, so colour matches the skin around it */
+    prox.push(c.x + a.x * zb + tu.x * f + tv.x * v, c.y + a.y * zb + tu.y * f + tv.y * v, c.z + a.z * zb + tu.z * f + tv.z * v);
+    return { p: [c.x + a.x * z + tu.x * f + tv.x * v, c.y + a.y * z + tu.y * f + tv.y * v, c.z + a.z * z + tu.z * f + tv.z * v], e: [s, phi, 7] };
+  });
+  geo.userData.rimH = rimH / (2 * R); geo.userData.prox = prox;
+  return orient(THREE, geo, v => v.clone().sub(c));
+}
 
 /** skin-covered vestigial orbit: a seated body-coloured dome (still exactly two) */
 export function buildVestigial(THREE, spec, seg) {
