@@ -231,7 +231,7 @@ void main(){ vec3 p = position; vec3 n = normal; float ph = phaseOf();
   p += inflateDisp(p);
   if(aBody.z>2.9 && aBody.z<3.3) p += n*aBody.w*uBreath*uLen*.0016;
   if(aBody.z>3.45 && aBody.z<3.7 && uJawOpenMax>.001) p += n*aBody.w*clamp(uJawAngle/uJawOpenMax,0.0,1.0)*uLen*.0042;   /* gular area swells as the mouth opens */
-  if(aBody.z>6.8) p += n*aBody.w*uBreath*uLen*.0005;
+  if(aBody.z>6.8 && aBody.z<7.6) p += n*aBody.w*uBreath*uLen*.0005;
 #ifdef JAW
   if(aBody.z>3.99 && aBody.z<4.1){   /* barbels: chin / lower-lip roots ride the lower jaw (tag 4 + .08*jawWeight); the free length sways a little */
     float jw=(aBody.z-4.0)/.08, a=-uJawAngle*jw, c=cos(a), s=sin(a); vec2 d=p.xy-uJawPivot;

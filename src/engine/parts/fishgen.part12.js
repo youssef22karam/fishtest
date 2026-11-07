@@ -40,7 +40,8 @@
   if(tissue>3.45 && tissue<3.7){ col=mix(col,mix(col,vec3(.72,.58,.55),.35),.6); col*=.90+.10*sin(ang*520.0+(u-uPreU)*26.0); }   /* branchiostegal membrane: fine ray fan */
   if(tissue>1.2 && tissue<1.3) col=mix(col,vec3(.40,.07,.08),.65)*.6;                    /* gill arches: dark red filaments hinted in shadow */
   if(tissue>1.4 && tissue<1.6) col=vec3(.60,.28,.29)*(.85+.15*fbm(vec2(u*60.0,ang*18.0)+uSeed));   /* tongue */
-  if(tissue>6.6) col*=.86+.08*step(tissue,7.2);
+  if(tissue>6.6 && tissue<7.6) col*=.86+.08*step(tissue,7.2);
+  if(tissue>7.9) col*=1.0-.30*smoothstep(.0,.85,vBody.w);   /* round 5B: nares / spiracle = a soft pit, at most 30 % darker than the skin around it, fading to nothing at the rim */
 
   /* material response */
   float tone2=scaleTone(sc);

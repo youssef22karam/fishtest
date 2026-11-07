@@ -178,22 +178,27 @@ function buildEyes(bm, seg, mats) {
   if (opaque.length) { const m = new THREE.Mesh(EYE.mergeParts(THREE, opaque), mats.eyeOrgan(false, eyeCol, specs[0].axis)); m.frustumCulled = false; m.userData.eyeball = true; m.userData.eyes = infos; out.push(m); }
   if (glass.length) { const m = new THREE.Mesh(EYE.mergeParts(THREE, glass), mats.eyeOrgan(true, eyeCol, specs[0].axis)); m.frustumCulled = false; m.renderOrder = 3; m.userData.eyeGlass = true; out.push(m); }
   if (skin.length) { const geo = mergeGeos(skin); skinAttributes(geo, bm); const m = new THREE.Mesh(geo, mats.body); m.frustumCulled = false; m.userData.eyeball = true; m.userData.eyes = infos; out.push(m); }
-  if (blends.length) { const geo = mergeGeos(blends), ab = new Float32Array(blends.reduce((n, b) => n + b.userData.prox.length / 3, 0) * 4); let o = 0; for (const b of blends) { const a = patchBodyCoords(bm, b.userData.prox, b.userData.side); ab.set(a, o); o += a.length; } geo.setAttribute('aBody', new THREE.BufferAttribute(ab, 4)); const m = new THREE.Mesh(geo, mats.body); m.frustumCulled = false; m.userData.eyeSkin = true; out.push(m); }
+  if (blends.length) { const ab = new Float32Array(blends.reduce((n, b) => n + b.userData.prox.length / 3, 0) * 4); let o = 0; for (const b of blends) { const a = patchBodyCoords(bm, b.userData.prox, b.userData.side, b); ab.set(a, o); o += a.length; } const geo = mergeGeos(blends); geo.setAttribute('aBody', new THREE.BufferAttribute(ab, 4)); const m = new THREE.Mesh(geo, mats.body); m.frustumCulled = false; m.userData.eyeSkin = true; out.push(m); }
   return out;
 }
 function buildNostrils(bm, mats) {
-  const geos = [], g = bm.g, points = {}, normal = new THREE.Vector3();
+  /* round 5B: the only marks that may sit on the cheek / snout are the paired nares (every plan) and the spiracle (plans that carry one: cartilaginous / flattened — never a bony plan). Both are SOFT, low-contrast
+     pits (tag 8: the skin colour darkened at most ~30 %, falling to zero at the rim — vBody.w), sized from the EYE (never from body depth), at the positions the plan puts them. No hard dark disk exists. */
+  const geos = [], g = bm.g, points = {}, normal = new THREE.Vector3(), bony = bm.a.gills === 'lateral';
   const theta = bm.a.gills === 'lateral' || bm.a.gills === 'ventral' ? -.82 : .23, nostrilInfo = [];
-  for (const side of [-1, 1]) for (const type of [0, ...(g.head.spiracles ? [1] : [])]) {
+  for (const side of [-1, 1]) for (const type of [0, ...(g.head.spiracles && !bony ? [1] : [])]) {
     const u = type ? bm.lm.eye + bm.h * .12 : bm.a.gills === 'lateral' ? Math.max(.008, bm.jawStartU * .5) : Math.max(.024, bm.lm.eye * .52), base = type && bm.law.flat ? 1.2 : theta + (type ? .4 : 0), th = side > 0 ? base : Math.PI - base;
     bm.rawSurface(u, th, points); bm.surfaceNormal(u, th, normal);
-    const rad = bm.maxD * (type ? .035 : .021) * (.45 + g.head.nostrils);
-    const disk = new THREE.SphereGeometry(rad, 8, 5); disk.scale(.65, .25, 1);
+    const rad = Math.min(bm.maxD * (type ? .035 : .021) * (.45 + g.head.nostrils), bm.eyeR * (type ? .5 : .3));
+    const disk = new THREE.SphereGeometry(rad, 10, 6); disk.scale(.65, .25, 1);
+    const P = disk.getAttribute('position'), wv = new Float32Array(P.count); for (let i = 0; i < P.count; i++) wv[i] = Math.max(0, Math.min(1, P.getY(i) / (rad * .25)));   /* 1 at the pit's centre, 0 at its rim */
+    disk.userData.w = wv;
     disk.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), normal));
     disk.translate(points.x + normal.x * rad * .1, points.y + normal.y * rad * .1, points.z + normal.z * rad * .1);
-    geos.push(disk); nostrilInfo.push({ type, side, y: points.y, ny: normal.y });
+    geos.push(disk); nostrilInfo.push({ type, side, y: points.y, ny: normal.y, rad });
   }
-  const geo = mergeGeos(geos); skinAttributes(geo, bm, 6); const mesh = new THREE.Mesh(geo, mats.body); mesh.frustumCulled = false; mesh.userData.nostrils = nostrilInfo; return mesh;
+  const geo = mergeGeos(geos); skinAttributes(geo, bm, 8); const ab = geo.getAttribute('aBody'); let o = 0; for (const d of geos) { const wv = d.userData.w; for (let i = 0; i < wv.length; i++) ab.setW(o + i, wv[i]); o += wv.length; }
+  const mesh = new THREE.Mesh(geo, mats.body); mesh.frustumCulled = false; mesh.userData.nostrils = nostrilInfo; return mesh;
 }
 function buildTeeth(bm, mats) {   /* round 2: rooted continuous rows on the lip line (teethgeo.js) */
   const m = bm.g.mouth; if (m.teethCount <= 0 || m.teeth === 'none') return null; return TEETHGEO.buildTeethRows(bm, mats, GH, m.teeth);
