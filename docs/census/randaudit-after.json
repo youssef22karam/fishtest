@@ -1,37 +1,43 @@
 {
  "label": "after",
  "std": {
-  "n": 300,
+  "n": 600,
   "byClass": {
    "EYE_OUTSIDE_HEAD": 0,
-   "EYE_SLICED": 0,
+   "EYE_SLICED": 1,
    "DETACHED_TEETH": 0,
    "FLAT_BODY_END": 0,
-   "MOUTH_CORNER_OPEN": 0
+   "MOUTH_CORNER_OPEN": 1
   },
-  "fishWith": 0,
-  "examples": []
+  "fishWith": 2,
+  "examples": [
+   "31XQJDRH stingray EYE_SLICED: eye seat: cornea buried 0.16 R in the head surface | EYE_SLICED: eye seat: cornea buried 0.16 R in the head surface",
+   "PBQ23RS6 sturgeon MOUTH_CORNER_OPEN: cheek wall has 6 free edges inside the head at the mouth corner (up to 0.05 head lengths deep)"
+  ]
  },
  "wonRaw": {
-  "n": 299,
-  "unviable": 1,
+  "n": 300,
+  "unviable": 0,
   "byClass": {
    "EYE_OUTSIDE_HEAD": 0,
-   "EYE_SLICED": 3,
+   "EYE_SLICED": 6,
    "DETACHED_TEETH": 0,
    "FLAT_BODY_END": 1,
    "MOUTH_CORNER_OPEN": 0
   },
-  "fishWith": 4,
+  "fishWith": 7,
   "examples": [
-   "Shore moray-angelshark EYE_SLICED: eye seat: cornea buried 0.38 R in the head surface | EYE_SLICED: eye seat: cornea buried 0.38 R in the head surface",
-   "Shore shark-remora EYE_SLICED: eye seat: cornea buried 0.30 R in the head surface | EYE_SLICED: eye seat: cornea buried 0.29 R in the head surface",
+   "Grassbed ray-clownfish EYE_SLICED: eye seat: cornea buried 0.31 R in the head surface | EYE_SLICED: eye seat: cornea buried 0.31 R in the head surface",
+   "Oceanic marlin-manta-fish EYE_SLICED: eye seat: cornea buried 0.19 R in the head surface | EYE_SLICED: eye seat: cornea buried 0.19 R in the head surface",
+   "Oceanic manta-pipefish EYE_SLICED: eye seat: cornea buried 0.24 R in the head surface | EYE_SLICED: eye seat: cornea buried 0.24 R in the head surface",
+   "Shore moray-angelshark EYE_SLICED: eye seat: cornea buried 0.27 R in the head surface | EYE_SLICED: eye seat: cornea buried 0.27 R in the head surface",
+   "Shore shark-remora EYE_SLICED: eye seat: cornea buried 0.19 R in the head surface | EYE_SLICED: eye seat: cornea buried 0.18 R in the head surface",
    "Brook marlin-flounder FLAT_BODY_END: rear cross-section drops 51% of the peduncle in one step (flat cut)",
-   "Brook haddock-angelshark EYE_SLICED: eye seat: cornea buried 0.11 R in the head surface | EYE_SLICED: eye seat: cornea buried 0.11 R in the head surface"
+   "Grassbed stingray-wrass-bluegill EYE_SLICED: eye seat: cornea buried 0.25 R in the head surface | EYE_SLICED: eye seat: cornea buried 0.25 R in the head surface"
   ]
  },
  "wonShipped": {
-  "n": 280,
+  "n": 283,
   "byClass": {
    "EYE_OUTSIDE_HEAD": 0,
    "EYE_SLICED": 0,
