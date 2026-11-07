@@ -52,9 +52,9 @@
    so the BodyModel, the gate, repair() and every cross / mutation / breed path see the same fitted head. */
 function fitHead(g) {
   const hd = g.head; if (!hd || hd.eyeSide === 'none' || !(hd.lengthFrac > 0)) return g;
-  const h = hd.lengthFrac, er = hd.eyeSize * h * .69, gsMax = .8, margin = .004;
+  const h = hd.lengthFrac, er = hd.eyeSize * h * .69, gsMax = GILL_START_MAX, margin = eyeMargin(er);   /* round 6H.2: the cap is the repair rules' own (eyeband.js) — a larger one here made fitHead and the rules undo each other */
   const need = (hd.eyeU * h + .5 * er + (hd.eyeSide === 'both' ? 0 : 2.3 * er) + margin) / h;   /* one-sided plans carry the second eye 2.3 R behind the first */                     /* gill-start fraction that clears the eye's rear edge */
-  if (need > hd.gillStart) { if (need <= gsMax) hd.gillStart = need; else { hd.gillStart = gsMax; hd.eyeU = (gsMax * h - .5 * er - (hd.eyeSide === 'both' ? 0 : 2.3 * er) - margin) / h; } }
+  if (need > hd.gillStart) { if (need <= gsMax) hd.gillStart = need; else { hd.gillStart = gsMax; hd.eyeU = eyeBand(h, hd.eyeSize, hd.eyeSide).seat; } }
   const lo = (er + .004) / h; if (hd.eyeU < lo) hd.eyeU = lo;           /* never ahead of the snout */
   return g;
 }

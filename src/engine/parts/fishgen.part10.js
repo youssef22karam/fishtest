@@ -153,23 +153,10 @@ function buildEyes(bm, seg, mats) {
   const g = bm.g, out = []; if (g.head.eyeSide === 'none') return out; const fr = {}, s = {}; const u = bm.lm.eye; bm.frame(u, fr); bm.section(u, s);
   const y = bm.eyeY; const list = g.head.eyeSide === 'both' ? [[1, y, u], [-1, y, u]] : g.head.eyeSide === 'left' ? [[1, y, u], [1, y, u + 2.3 * bm.eyeR / bm.L]] : [[-1, y, u], [-1, y, u + 2.3 * bm.eyeR / bm.L]];
   const EL = bm.law.eye, ray = ['ray', 'benthicShark'].includes(bm.a.family), specs = [], opaque = [], glass = [], skin = [], infos = [], blends = [];
-  /* round 6H.1 (L1): the station the audit measures is the nearest SPINE point to the seated eye CENTRE, which sits a little behind the sampled station on a domed / short head. The sampled
-     station is therefore clamped against the MEASURED one: the whole eye (centre + EYE_CLEAR x its own radius) must clear the gill front. Same shift for both eyes of a one-sided plan. */
-  const measU = c => { const sp = bm.spine, NS = sp.length - 1; let best = 1e9, bi = 0; for (let k = 0; k <= NS; k++) { const d = (sp[k].x - c.x) ** 2 + (sp[k].y - c.y) ** 2; if (d < best) { best = d; bi = k; } } return bi / NS; };
-  /* round 6H.1 (L5, disc plans): the eye seat is chosen against the LOCAL dome - candidate lateral stations (fractions of the core width, outermost first) are scored with the audit's own cornea
-     burial measure at the nominal seat; the first that clears (within the protrusion law's lift allowance) wins, else the least buried. The eye never sits where the dome rises over it. */
-  const discTheta = (uu, s, fr) => { let bt = 0, bw = 1e9; for (const f of [.8, .68, .56, .44, .32, .2]) {
-    const th = DISC.thetaOfZ(s, s.coreW * f), sf = {}, ax = new THREE.Vector3(); bm.rawSurface(uu, th, sf); bm.surfaceNormal(uu, th, ax); ax.add(new THREE.Vector3(-fr.tx * Math.max(g.head.eyeForward, EL.forwardMin) * .16, 0, 0)).normalize();
-    const c = new THREE.Vector3(sf.x, sf.y, sf.z).addScaledVector(ax, -bm.eyeR * LAW.EYE_SEAT), fw = new THREE.Vector3(-fr.tx, -fr.ty, 0), tu = fw.addScaledVector(ax, -fw.dot(ax)).normalize(), tv = new THREE.Vector3().crossVectors(ax, tu).normalize();
-    let w = 0; for (const p of EYE.corneaPoints(THREE, c, ax, tu, tv, bm.eyeR)) w = Math.max(w, EYE.headDepthAt(bm, p.addScaledVector(ax, -.012 * bm.eyeR), clamp)); w /= bm.eyeR;
-    if (w < bw) { bw = w; bt = th; } if (w <= .03) break; } return bt; };
-  const rL = bm.eyeR / bm.L, gillLim = bm.lm.gillStart - EYE.EYE_CLEAR * rL; let du = 0;
-  for (let pass = 0; ; pass++) {
-  specs.length = 0; opaque.length = 0; glass.length = 0; skin.length = 0; infos.length = 0; blends.length = 0;
-  for (const [side, yy, uu0] of list) {
-    const uu = uu0 - (globalThis.__NOSHIFT ? 0 : du); bm.frame(uu, fr); bm.section(uu, s);
+  for (const [side, yy, uu] of list) {
+    bm.frame(uu, fr); bm.section(uu, s);
     const yn = yy > 0 ? s.nD : s.nV, yr = yy > 0 ? s.dUp : s.dDn;
-    const th = bm.disc ? discTheta(uu, s, fr) : ray ? Math.acos(clamp(Math.pow(s.coreW * .8 / Math.max(1e-8, s.w), s.n / 2), 0, 1))
+    const th = bm.disc ? DISC.thetaOfZ(s, s.coreW * .8) : ray ? Math.acos(clamp(Math.pow(s.coreW * .8 / Math.max(1e-8, s.w), s.n / 2), 0, 1))
       : Math.asin(Math.sign(yy) * Math.pow(clamp(Math.abs(yy) / Math.max(1e-8, yr), 0, .9), yn / 2));
     const theta = side > 0 ? th : Math.PI - th, surface = {}, axis = new THREE.Vector3();
     bm.rawSurface(uu, theta, surface); bm.surfaceNormal(uu, theta, axis);
@@ -188,11 +175,6 @@ function buildEyes(bm, seg, mats) {
     const blend = EYE.buildSkinBlend(THREE, spec, seg, sk); infos[infos.length - 1].seatExtra = dl2 / bm.eyeR;
     blends.push(blend); infos[infos.length - 1].rimH = blend.userData.rimH;
   }
-  let ex = 0, loU = 1; for (const i of infos) { const m = measU(i.center); ex = Math.max(ex, m - gillLim); loU = Math.min(loU, m); }
-  if (ex <= 0 || pass >= 7) break;
-  const room = Math.max(0, loU - rL - .004 + .002);   /* never ahead of the snout */
-  const step = Math.min(ex + .0004, room); if (step < 1e-5) break; du += step;
-  }
   bm.eyes = infos;
   const eyeCol = irisColor(g, EL, bm.a.gills === 'lateral');
   if (opaque.length) { const m = new THREE.Mesh(EYE.mergeParts(THREE, opaque), mats.eyeOrgan(false, eyeCol, specs[0].axis)); m.frustumCulled = false; m.userData.eyeball = true; m.userData.eyes = infos; out.push(m); }
@@ -201,6 +183,71 @@ function buildEyes(bm, seg, mats) {
   if (blends.length) { const ab = new Float32Array(blends.reduce((n, b) => n + b.userData.prox.length / 3, 0) * 4); let o = 0; for (const b of blends) { const a = patchBodyCoords(bm, b.userData.prox, b.userData.side, b); ab.set(a, o); o += a.length; } const geo = mergeGeos(blends); geo.setAttribute('aBody', new THREE.BufferAttribute(ab, 4)); const m = new THREE.Mesh(geo, mats.body); m.frustumCulled = false; m.userData.eyeSkin = true; out.push(m); }
   return out;
 }
+function buildNostrils(bm, mats) {
+  if (bm.disc) return DISC.buildMarks(bm, mats, GH);
+  /* round 5B: the only marks that may sit on the cheek / snout are the paired nares (every plan) and the spiracle (plans that carry one: cartilaginous / flattened — never a bony plan). Both are SOFT, low-contrast
+     pits (tag 8: the skin colour darkened at most ~30 %, falling to zero at the rim — vBody.w), sized from the EYE (never from body depth), at the positions the plan puts them. No hard dark disk exists. */
+  const geos = [], g = bm.g, points = {}, normal = new THREE.Vector3(), bony = bm.a.gills === 'lateral';
+  const theta = bm.a.gills === 'lateral' || bm.a.gills === 'ventral' ? -.82 : .23, nostrilInfo = [];
+  for (const side of [-1, 1]) for (const type of [0, ...(g.head.spiracles && !bony ? [1] : [])]) {
+    const u = type ? bm.lm.eye + bm.h * .12 : bm.a.gills === 'lateral' ? Math.max(.008, bm.jawStartU * .5) : Math.max(.024, bm.lm.eye * .52), base = type && bm.law.flat ? 1.2 : theta + (type ? .4 : 0), th = side > 0 ? base : Math.PI - base;
+    bm.rawSurface(u, th, points); bm.surfaceNormal(u, th, normal);
+    const rad = Math.min(bm.maxD * (type ? .035 : .021) * (.45 + g.head.nostrils), bm.eyeR * (type ? .5 : .3));
+    const disk = new THREE.SphereGeometry(rad, 10, 6); disk.scale(.65, .25, 1);
+    const P = disk.getAttribute('position'), wv = new Float32Array(P.count); for (let i = 0; i < P.count; i++) wv[i] = Math.max(0, Math.min(1, P.getY(i) / (rad * .25)));   /* 1 at the pit's centre, 0 at its rim */
+    disk.userData.w = wv;
+    disk.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), normal));
+    disk.translate(points.x + normal.x * rad * .1, points.y + normal.y * rad * .1, points.z + normal.z * rad * .1);
+    geos.push(disk); nostrilInfo.push({ type, side, y: points.y, ny: normal.y, rad });
+  }
+  const geo = mergeGeos(geos); skinAttributes(geo, bm, 8); const ab = geo.getAttribute('aBody'); let o = 0; for (const d of geos) { const wv = d.userData.w; for (let i = 0; i < wv.length; i++) ab.setW(o + i, wv[i]); o += wv.length; }
+  const mesh = new THREE.Mesh(geo, mats.body); mesh.frustumCulled = false; mesh.userData.nostrils = nostrilInfo; return mesh;
+}
+function buildTeeth(bm, mats) {   /* round 2: rooted continuous rows on the lip line (teethgeo.js) */
+  const m = bm.g.mouth; if (m.teethCount <= 0 || m.teeth === 'none') return null; return TEETHGEO.buildTeethRows(bm, mats, GH, m.teeth);
+}
+/* barbels: rooted, tapered, capped strands (appendages.js); stations and lengths come from the barbel law */
+function buildBarbels(bm, mats) { return APP.buildBarbels(bm, mats, GH); }
+// @@PART js/app.part11.js (11/19) lines 2151-2428 of the original module script -- stripped by build.mjs
+function buildSpecials(bm, mats) {
+  const g = bm.g, sp = g.head.special, L = bm.L, out = [], fr = {}, s = {};
+  if (sp === 'none' || sp === 'horns' || bm.billStart !== null) return out;
+  const add = (geo, mat) => { const m = new THREE.Mesh(geo, mat); m.frustumCulled = false; out.push(m); return m; };
+  bm.frame(0.003, fr); bm.section(0.03, s); const snX = fr.px, snY = fr.py;
+  const loftSpike = (uBase, len, taperY, taperZ, droop, widen) => {
+    /* base ring sampled ON the skin at uBase → the junction is vertex-coincident with the body, no seam */
+    const M = 18, N = 14, ring = [], pos = [], idx = [], p = {}, frB = {}; bm.frame(uBase, frB);
+    let cy = 0, cz = 0;
+    for (let j = 0; j < M; j++) { bm.rawSurface(uBase, -Math.PI / 2 + j / M * TAU, p); ring.push([p.x, p.y, p.z]); cy += p.y / M; cz += p.z / M; }
+    const fwdX = -frB.tx, fwdY = -frB.ty, tipX = frB.px + fwdX * len, tipY = cy + fwdY * len - droop * len;
+    for (let i = 0; i <= N; i++) {
+      const f = i / N, ease = Math.pow(f, .9), shrink = Math.pow(1 - f, .9) * (1 - f * .15) + .02;
+      const axX = lerp(frB.px, tipX, ease), axY = lerp(cy, tipY, ease) - droop * len * f * f;
+      for (let j = 0; j < M; j++) {
+        const [bx, by, bz] = ring[j];
+        const sy = shrink * lerp(1, taperY, f), szf = shrink * lerp(1, taperZ, f) * (1 + widen * Math.sin(Math.PI * f) * .6);
+        pos.push(i === 0 ? bx : axX, i === 0 ? by : axY + (by - cy) * sy, i === 0 ? bz : (bz - cz) * szf + cz);
+      }
+    }
+    for (let i = 0; i < N; i++) for (let j = 0; j < M; j++) { const a = i * M + j, b = i * M + (j + 1) % M, c = a + M, d = b + M; idx.push(a, b, c, b, d, c); }
+    const rings = []; for (let i = 0; i <= N; i++) { const r = []; for (let j = 0; j < M; j++) { const o = (i * M + j) * 3; r.push([pos[o], pos[o + 1], pos[o + 2]]); } rings.push(r); }   /* round 6H: ring samples, rostral teeth root IN this edge */
+    const tip = pos.length / 3; pos.push(tipX + fwdX * len * .015, tipY, 0);
+    for (let j = 0; j < M; j++) idx.push(tip, N * M + j, N * M + (j + 1) % M);
+    const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); geo.setIndex(idx); geo.computeVertexNormals(); skinAttributes(geo, bm); geo.userData.rings = rings; return geo;
+  };
+  if (sp === 'bill' || sp === 'sword') { add(loftSpike(.006, g.head.specialLen * L, sp === 'sword' ? .3 : .55, sp === 'sword' ? 1.1 : .6, .05, 0), mats.body); }
+  else if (sp === 'rostrum' || sp === 'paddle') { const len = g.head.specialLen * L, w = g.head.specialWidth * L * (sp === 'paddle' ? 2 : 1); const blade = add(loftSpike(.008, len, sp === 'paddle' ? .22 : .14, Math.max(.6, w / Math.max(.001, bm.bp.width(.06) * L)), .01, sp === 'paddle' ? .5 : .15), mats.body);
+    if (sp === 'rostrum') out.push(ROSTRUM.buildRostralTeeth(THREE, blade, len, L, mats.tooth)); }
+  else if (sp === 'esca') { for (const m of APP.buildLure(bm, mats, GH)) { out.push(m); } }
+  else if (sp === 'whip') { for (const m of APP.buildWhip(bm, mats, GH)) out.push(m); }
+  return out;
+}
+function landmarks3D(bm) { const lm = bm.lm, p = {}, out = []; const spec = { snout: [0.004, 0], mouthCorner: [lm.mouthCorner, 'm'], eye: [lm.eye, 'e'], preopercle: [lm.preopercle, 0], operculum: [lm.operculum, 0], pectoralBase: [lm.pectoralBase, 0], pelvicBase: [lm.pelvicBase, -Math.PI / 2], vent: [lm.vent, -Math.PI / 2], analOrigin: [lm.analOrigin, -Math.PI / 2], analEnd: [lm.analEnd, -Math.PI / 2], dorsalOrigin: [lm.dorsalOrigin, Math.PI / 2], dorsalEnd: [lm.dorsalEnd, Math.PI / 2], peduncleStart: [lm.peduncleStart, Math.PI / 2], caudalBase: [0.999, Math.PI / 2] };
+  const fr = {}, s = {}; for (const k in spec) { const [u, th] = spec[k]; if (th === 'm') { bm.frame(u, fr); bm.section(u, s); const ym = bm.mouthLineY(u, s); out.push({ name: k, x: fr.px + fr.nx * ym, y: fr.py + fr.ny * ym, z: bm.halfWidthAtY(s, ym) }); } else if (th === 'e') { bm.frame(u, fr); bm.section(u, s); out.push({ name: k, x: fr.px + fr.nx * bm.eyeY, y: fr.py + fr.ny * bm.eyeY, z: bm.halfWidthAtY(s, bm.eyeY) }); } else { bm.surface(u, th, p); out.push({ name: k, x: p.x, y: p.y, z: p.z }); } } return out; }
+/**
+ * Build a renderable fish from a genome.
+ * @returns {{group:THREE.Group, uniforms:Object, materials:Object, bm:BodyModel, info:Object, dispose:()=>void}}
+ */
 function buildFish(g, opts = {}) {
   const q = QUALITY[opts.quality || 'hero'], bm = new BodyModel(g), f = g.fins, lm = bm.lm, maxD = bm.maxD; const geos = [];
   bm.lod = !q.detail;

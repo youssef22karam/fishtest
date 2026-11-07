@@ -1,5 +1,5 @@
   fish: { family: 'rayfin', label: 'Ray-finned fusiform', solid: false, gills: 'opercular', root: .036, freeTip: 0, eyeInset: .32, tailSpan: [.85, 2.4], dorsalLimit: 1.15,
-    locks: { 'head.operculum': true, 'head.gillSlits': 0 }, bounds: { 'head.gillStart': [.45, .78], 'mouth.cavityDepth': [.3, .78] },
+    locks: { 'head.operculum': true, 'head.gillSlits': 0 }, bounds: { 'head.gillStart': [.45, GILL_START_MAX], 'mouth.cavityDepth': [.3, .78] },
     traits: { 'body.shoulder': r(.12, .22), 'body.tailTaper': r(.58, .75), 'fins.caudal.span': r(1.2, 1.7), 'fins.caudal.notch': r(.48, .63) } },
   agnatha: { family: 'jawless', label: 'Jawless ribbon', gills: 'pores', eyeInset: .55, tailSpan: [.5, 1.1],
     locks: { 'head.operculum': false, 'head.gillSlits': 7, 'mouth.type': 'suction', 'fins.pectoral.present': false, 'fins.pelvic.present': false, 'swim.mode': 'anguilliform' },
