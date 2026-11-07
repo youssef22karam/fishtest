@@ -19,10 +19,11 @@
     /* round 2.1: no periorbital ring. The skin simply darkens in the last fraction before the eyeball (d ≈ distance from the eye centre in eye radii; the skin-blend cap spans d .6–1.2) */
     float dEy=uEyeRU>0.0 ? length(vec2((u-uEyeU)/max(1e-4,uEyeRU),(abs(vert)-abs(uEyeVert))/max(1e-4,uEyeRV))) : 9.0;
     col*=1.0-.22*(1.0-smoothstep(.55,1.0,dEy));   /* round 4: lighter, so the body pattern reads straight across the eye-blend patch */
-    float behind=smoothstep(uHeadU-.001,uHeadU+.0015,u)*(1.0-smoothstep(uHeadU+.002,uHeadU+.016,u))*(1.0-skinT0(tissue));
+    float eU=opE(vert), bw=uOpW>0.0 ? uOpW*1.8 : .014;
+    float behind=smoothstep(eU-.001,eU+.0015,u)*(1.0-smoothstep(eU+.002,eU+bw+.002,u))*(1.0-skinT0(tissue));
     col*=1.0-.40*behind;                                                     /* soft shadow the free margin casts on the trunk */
-    col*=1.0-.34*smoothstep(.45,1.0,rimK);                                   /* fine tapered rim of the cover */
-    col*=1.0+.05*(1.0-smoothstep(.0,.003,abs(u-uHeadU+.002)))*(1.0-rimK);
+    col*=1.0-.12*smoothstep(.45,1.0,rimK)-.26*smoothstep(3.22,3.26,tissue)*step(tissue,3.3);   /* crest barely tinted; the rear wall sits in its own shade */                                   /* fine tapered rim of the cover */
+    col*=1.0+.05*(1.0-smoothstep(.0,.003,abs(u-eU+.002)))*(1.0-rimK);
   }
 
   if(uScale==6){ float rows=min(abs(vert-.9),min(abs(abs(vert)-.35),abs(vert+.9)));
@@ -218,6 +219,7 @@ uniform vec3 uGlow; varying vec3 vN, vWP;
 void main(){ float fl = 0.75 + 0.25*sin(uTime*5.0) * sin(uTime*2.3+1.0); vec3 N = normalize(vN); vec3 V = normalize(cameraPosition-vWP); float rim = pow(1.0-max(dot(N,V),0.0),2.0); vec3 c = uGlow*fl*(1.2+rim) + vec3(0.3)*rim; float fog = fogAmt(vWP); c = mix(c,uFogCol,fog*0.6); gl_FragColor = vec4(c,1.0); }`;
 const hslCol = a => new THREE.Color().setHSL(((a[0] % 360) + 360) % 360 / 360, clamp(a[1], 0, 1), clamp(a[2], 0, 1), THREE.SRGBColorSpace);
 function makeUniforms(g, bm) {
+  const cvr = GILL.kindOf(bm) === 'cover';
   const lm = bm.lm, s = g.skin;
   /* where the eye sits in (u, circumferential-vertical) skin space, so the fragment shader can
      build an orbital rim, a sunken socket and periorbital pigment that actually line up with it */
@@ -237,7 +239,7 @@ function makeUniforms(g, bm) {
     uBreath: { value: 0 }, uInflate: { value: 0 }, uJawAngle: { value: 0 }, uJawPivot: { value: new THREE.Vector2(bm.headX, 0) }, uJawOpenMax: { value: 0.3 }, uJawSpread: { value: 0 }, uJawU0: { value: MOUTH.jawU0(bm) }, uHingeU: { value: MOUTH.jawU1(bm) }, uMLine: { value: MOUTH.edgeTable(bm, GH) }, uJawProtrude: { value: 0 }, uPhase: { value: 0 }, uBurst: { value: 0 },
     uBase: { value: cBase }, uBelly: { value: cBelly }, uAccent: { value: cAcc }, uFinCol: { value: cFin }, uEyeCol: { value: hslCol(s.eye) }, uGlow: { value: hslCol(s.glow) }, uBand: { value: s.band }, uBandCol: { value: hslCol(s.bandColor) },
     uPattern: { value: Math.max(0, SCHEMA['skin.pattern'].opts.indexOf(s.pattern)) }, uPatScale: { value: s.patternScale }, uPatStrength: { value: s.patternStrength }, uScale: { value: Math.max(0, SCHEMA['skin.scale'].opts.indexOf(s.scale)) }, uScaleSize: { value: s.scaleSize },
-    uCounter: { value: s.countershade }, uIrid: { value: s.iridescence }, uGloss: { value: s.gloss }, uPhoto: { value: s.photophores }, uTrans: { value: s.translucency }, uSlits: { value: g.head.gillSlits }, uHeadU: { value: lm.operculum }, uPreU: { value: lm.preopercle }, uMouthU: { value: lm.mouthCorner },
+    uCounter: { value: s.countershade }, uIrid: { value: s.iridescence }, uGloss: { value: s.gloss }, uPhoto: { value: s.photophores }, uTrans: { value: s.translucency }, uSlits: { value: g.head.gillSlits }, uHeadU: { value: lm.operculum }, uOpOff: { value: cvr ? OP.slitW * bm.h * 1.15 : 0 }, uOpBow: { value: cvr ? OP.bow * bm.h : 0 }, uOpW: { value: cvr ? OP.slitW * bm.h : 0 }, uPreU: { value: lm.preopercle }, uMouthU: { value: lm.mouthCorner },
     uLateral: { value: s.lateralLine }, uLips: { value: g.mouth.lips }, uNostrils: { value: g.head.nostrils }, uMouthStart: { value: bm.jawStartU }, uMouthTipF: { value: bm.tipF }, uMouthCornerF: { value: bm.cornerF }, uElectric: { value: s.electric ? 1 : 0 }, uSeed: { value: (cyrb128(String(g.meta.surfaceSeed || g.meta.seed))[0] % 1000) / 37 }, uFineness: { value: g.body.fineness }, uColor: { value: hslCol([s.base[0], s.base[1] * 0.6, s.base[2] * 0.75]) }, uSacc: { value: new THREE.Vector2() }, uPupil: { value: 0 }
   });
 }

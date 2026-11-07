@@ -19,8 +19,8 @@
       const jawMesh = new THREE.Mesh(jaw.geo, mats.jaw); jawMesh.frustumCulled = false; group.add(jawMesh); parts.jaw = jawMesh;
       if (jaw.upper) { geos.push(jaw.upper); tris += jaw.upper.index.count / 3; const um = new THREE.Mesh(jaw.upper, mats.jaw); um.frustumCulled = false; group.add(um); parts.upperJaw = um; }
     } else { bm.pivotX = bm.headX; uni.uJawOpenMax.value = 0; }
-    if (g.head.operculum) { const og = buildOperculum(bm); geos.push(og); tris += og.index.count / 3; const om = new THREE.Mesh(og, mats.jaw); om.frustumCulled = false; group.add(om); parts.operculum = om; }
-    for (const mesh of [...buildMouthDetails(bm, mats).map(m => { m.userData.mouthPart = true; return m; }), buildGills(bm, mats), buildNostrils(bm, mats)]) { geos.push(mesh.geometry); group.add(mesh); }
+    if (GILL.kindOf(bm) === 'cover') { const og = GILL.buildOperculum(bm, GH); geos.push(og); tris += og.index.count / 3; const om = new THREE.Mesh(og, mats.jaw); om.frustumCulled = false; group.add(om); parts.operculum = om; }
+    for (const mesh of [...buildMouthDetails(bm, mats).map(m => { m.userData.mouthPart = true; return m; }), GILL.buildGills(bm, mats, GH), buildNostrils(bm, mats)]) { geos.push(mesh.geometry); group.add(mesh); }
     for (const e of buildEyes(bm, q.eye, mats)) { geos.push(e.geometry); tris += e.geometry.index.count / 3; group.add(e); }
     const teeth = bm.oralDisc || bm.ventralMouth || bm.law.mouth.construction === 'fused' ? null : buildTeeth(bm, mats); if (teeth) { geos.push(teeth.geometry); tris += teeth.geometry.index.count / 3 * teeth.count; group.add(teeth); parts.teeth = teeth; }
     const barb = buildBarbels(bm, mats); if (barb) { geos.push(barb.geometry); tris += barb.geometry.index.count / 3; group.add(barb); if (bm.barbelTip && g.skin.photophores > 0) { const bulb = new THREE.SphereGeometry(Math.max(0.003, 0.012 * bm.L), 8, 6); bulb.translate(bm.barbelTip.x, bm.barbelTip.y, bm.barbelTip.z); geos.push(bulb); const bm2 = new THREE.Mesh(bulb, mats.glow); group.add(bm2); } }
@@ -233,6 +233,13 @@ void main(){ vec3 p = position; vec3 n = normal; float ph = phaseOf();
   if(aBody.z>3.45 && aBody.z<3.7 && uJawOpenMax>.001) p += n*aBody.w*clamp(uJawAngle/uJawOpenMax,0.0,1.0)*uLen*.0042;   /* gular area swells as the mouth opens */
   if(aBody.z>6.8) p += n*aBody.w*uBreath*uLen*.0005;
 #ifdef JAW
+  if(aBody.z>3.99 && aBody.z<4.1){   /* barbels: chin / lower-lip roots ride the lower jaw (tag 4 + .08*jawWeight); the free length sways a little */
+    float jw=(aBody.z-4.0)/.08, a=-uJawAngle*jw, c=cos(a), s=sin(a); vec2 d=p.xy-uJawPivot;
+    if(uJawOpenMax>.001){ p.xy=uJawPivot+vec2(c*d.x-s*d.y, s*d.x+c*d.y); n.xy=vec2(c*n.x-s*n.y, s*n.x+c*n.y); }
+    p.y += sin(uTime*1.9+aBody.x*70.0)*uLen*.0011*aBody.w*aBody.w; p.z += sin(uTime*1.3+aBody.x*50.0)*uLen*.0007*aBody.w*aBody.w;
+  }
+#endif
+#ifdef JAW
   if(aBody.z < 2.0){ p = jawSpread(p, aBody.x, aBody.w, clamp(uJawAngle/max(uJawOpenMax,1e-4),0.0,1.0)); vec2 d = p.xy - uJawPivot; float a = -uJawAngle*aBody.w; float c = cos(a), s = sin(a); p.xy = uJawPivot + vec2(c*d.x - s*d.y, s*d.x + c*d.y); p.x += uJawProtrude*aBody.w; n.xy = vec2(c*n.x - s*n.y, s*n.x + c*n.y); }
   else if(aBody.z < 2.1){ p.x += uJawProtrude*aBody.w; p.y -= uJawProtrude*aBody.w*.35; }   /* upper jaw: slides forward-down with the open amount */
 #endif
@@ -241,6 +248,8 @@ const FS_BODY = GLSL_COMMON_FS + GLSL_PIGMENT + /* glsl */`
 uniform float uLen,uScaleSize,uIrid,uGloss,uPhoto,uTrans,uHeadU,uPreU,uMouthU,uLateral,uElectric,uDetail,uMouthStart,uMouthTipF,uMouthCornerF,uManta,uJawAngle,uJawOpenMax,uGape,uJawU0,uHingeU; uniform float uMLine[40];
 uniform float uScaleVis,uMatte,uSheen,uDeep; uniform vec3 uIntLip,uIntThroat;
 uniform float uSilver,uLips,uEyeU,uEyeVert,uEyeRU,uEyeRV,uNostrils,uSlits;
+uniform float uOpOff,uOpBow,uOpW;   /* round 5A: operculum rear-edge curve (headlaw.opEdgeU: vc .22, vs 1.22); all 0 on non-cover plans */
+float opE(float vert){ float q=clamp((vert-.22)/1.22,-1.0,1.0); return uHeadU-uOpOff-uOpBow*q*q; }
 uniform int uScale; varying vec3 vN,vWP,vLP; varying vec4 vBody; varying vec2 vCirc;
 float skinT0(float t){ return (t>2.95 && t<3.3) ? 1.0 : 0.0; }
 float gCirc = 1.0;   /* circuli visibility, killed when scales fall under a pixel */
@@ -293,9 +302,10 @@ float microH(float u,float vert,float head){
   }
   /* round 2.1: no orbital relief ring — the skin-blend cap (eyegeo.buildSkinBlend) carries the transition to the eyeball */
   /* operculum: a flat bone plate with radial striae and a raised free margin */
-  float op=smoothstep(uPreU,uPreU+(uHeadU-uPreU)*.3,u)*(1.0-smoothstep(uHeadU-.012,uHeadU+.006,u));
+  float eU=opE(vert);
+  float op=smoothstep(uPreU,uPreU+(eU-uPreU)*.3,u)*(1.0-smoothstep(eU-.012,eU+.006,u));
   h += op*(.03*sin((u-uPreU)*95.0/max(.12,uHeadU)+vert*7.0)*gFine+.04);
-  h += (1.0-smoothstep(.0,.006,abs(u-uHeadU)))*.20;                                    /* free margin ridge */
+  h += (1.0-smoothstep(.0,.006,abs(u-eU)))*.20;                                        /* free margin ridge */
   h += (1.0-smoothstep(.0,.008,abs(u-uPreU)))*.07;                                     /* preopercular ridge */
   /* nares: paired pits on the snout */
   float nd=length(vec2((u-uEyeU*.52)/.013,(vert-.30)/.085));

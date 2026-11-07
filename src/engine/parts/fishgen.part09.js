@@ -90,6 +90,7 @@ class BodyModel {
     const under = ['inferior', 'subterminal', 'suction'].includes(g.mouth.type);
     this.jawStartU = under ? this.h * .16 : .003;
     this.jawStartU = Math.min(this.jawStartU, this.mcU * .45);
+    if (this.law.mouth.ventral) this.jawStartU = Math.min(this.law.mouth.setback * this.h, this.mcU * .62);   /* round 5A: cartilaginous plan - lip line under the snout, set back from the tip */
     if (g.head.special === 'hammer') this.jawStartU = Math.min(Math.max(this.jawStartU, g.head.specialLen * .72), this.mcU * .8);
     if (g.head.special === 'bill' || g.head.special === 'sword') this.jawStartU = Math.min(this.mcU * .5, Math.max(this.jawStartU, this.mcU * .35));
     /* eyeSize = visible eye diameter as a fraction of head length; the ball is recessed so only ~0.73 of its radius shows */
@@ -160,13 +161,7 @@ class BodyModel {
       ly *= 1 - (this.a.family === 'ray' ? .90 : .78) * sstep(.08, .96, outboard);
     }
     const h = this.h;
-    if (g.head.gillSlits && this.a.gills === 'lateral' && u > this.lm.gillStart - .02 && u < this.lm.gillEnd + .02) {
-      for (let i = 0; i < g.head.gillSlits; i++) {
-        const gu = lerp(this.lm.gillStart, this.lm.gillEnd, (i + .5) / g.head.gillSlits) + g.head.gillSlant * h * .06 * (1 - st * st);
-        const lf = .62 + .38 * Math.sin(Math.PI * (i + .5) / g.head.gillSlits), face = 1 - sstep(.58 * lf, .9 * lf, Math.abs(st));
-        lz -= Math.sign(ct) * s.w * .055 * face * gaussf((u - gu) / (h * .007));
-      }
-    }
+    lz -= Math.sign(ct) * GILL.cut(this, u, st, s.w);   /* round 5A: gill-slit grooves (cartilaginous) / opercular trench (bony) */
     if (g.body.keel > 0) lz += Math.sign(ct) * g.body.keel * this.maxD * 0.08 * gaussf((u - 0.95) / 0.045) * Math.pow(Math.abs(ct), 6);
     out.mouth = 0;
     out.x = fr.px + fr.nx * ly; out.y = fr.py + fr.ny * ly; out.z = lz; out.ly = ly; out.lz = lz; return out;
@@ -204,9 +199,8 @@ class BodyModel {
 function buildBodyGeometry(bm, S, R) {
   const billRings = bm.billStart === null ? 0 : (S < 30 ? 5 : 12);
   const Ubase = []; for (let i = 0; i <= S + billRings; i++) { const t = Math.max(0, i - billRings) / S; Ubase.push(i < billRings ? lerp(bm.billStart, .004, (i + 1) / (billRings + 1)) : Math.max(.004, t * (.6 + .4 * t))); }
-  if (!bm.lod && bm.g.head.gillSlits && bm.a.gills === 'lateral') {      /* extra stations across every slit: the groove gets real depth instead of aliasing */
-    const ex = [], hh = bm.h; for (let k = 0; k < bm.g.head.gillSlits; k++) { const gu = lerp(bm.lm.gillStart, bm.lm.gillEnd, (k + .5) / bm.g.head.gillSlits) + bm.g.head.gillSlant * hh * .03; for (let j = -4; j <= 4; j++) ex.push(gu + j * hh * .0032); }
-    for (const e of ex) if (e > .006 && e < .98) Ubase.push(e);
+  if (!bm.lod) {      /* extra stations across every groove / the opercular trench: real depth instead of aliasing */
+    for (const e of GILL.extraStations(bm)) if (e > .006 && e < .98) Ubase.push(e);
     Ubase.sort((a, b) => a - b); for (let i = Ubase.length - 1; i > 0; i--) if (Ubase[i] - Ubase[i - 1] < 1e-5) Ubase.splice(i, 1);
   }
   const stations = Ubase.length - 1;
@@ -223,42 +217,6 @@ function buildBodyGeometry(bm, S, R) {
   const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.BufferAttribute(pos, 3)); geo.setAttribute('aBody', new THREE.BufferAttribute(ab, 4)); geo.setIndex(idx); geo.computeVertexNormals();
   bm.loft = { geo, us, R };
   return geo;
-}
-function buildOperculum(bm) {
-  /* refined cover: the plate is lifted most in its middle and TAPERS to a fine rim that lies flush on the trunk (the body continues uninterrupted underneath);
-     its rear free margin is sampled on the head's own surface (same u / theta system as the body, so pattern and scales continue across the border). */
-  const lm = bm.lm, u0 = lm.preopercle, u1 = lm.operculum + .008, NS = 10, NR = 20, pos = [], ab = [], idx = []; const fr = {}, s = {}, p = {}, nq = {}; let v = 0;
-  const put = (u, th, side, off, tag, w) => {
-    const tb = side > 0 ? th : Math.PI - th, o = bm.maxD * off;
-    if (bm.loft) {          /* sample the RENDERED body surface: the cover is flush with the trunk by construction */
-      bm.sampleLoft(u, tb, p); bm.sampleLoft(u, tb, nq, 'normal'); const nl = Math.hypot(nq.x, nq.y, nq.z) || 1;
-      pos.push(p.x + nq.x / nl * o, p.y + nq.y / nl * o, p.z + nq.z / nl * o);
-    } else {
-      bm.frame(u, fr); bm.section(u, s); bm.point(u, tb, p, fr, s, true);
-      const l = Math.hypot(p.ly, p.lz) || 1;
-      pos.push(p.x + fr.nx * p.ly / l * o, p.y + fr.ny * p.ly / l * o, p.z + p.lz / l * o);
-    }
-    ab.push(u, side > 0 ? .25 + th / TAU : .75 - th / TAU, tag, w); v++;
-  };
-  for (const side of [1, -1]) { const v0 = v;
-    for (let i = 0; i <= NS; i++) {
-      const f = i / NS, rim = sstep(0, .3, f) * (1 - sstep(.84, 1, f));
-      for (let j = 0; j <= NR; j++) {
-        const th = lerp(-1.18, 1.08, j / NR), window = Math.pow(Math.sin(Math.PI * j / NR), .7);
-        const u = lerp(u0, u1 + .010 * window, f);
-        const margin = sstep(.88, 1, f) * (.35 + .65 * window);               /* 0 on the plate, 1 along the free margin */
-        put(u, th, side, .0012 + .0105 * rim * Math.pow(window, .8), 3 + .2 * margin, smoother(f) * window);
-      }
-    }
-    for (let i = 0; i < NS; i++) for (let j = 0; j < NR; j++) { const a = v0 + i * (NR + 1) + j, b2 = a + NR + 1; idx.push(a, a + 1, b2, a + 1, b2 + 1, b2); }
-    /* branchiostegal membrane: fine ray fan under the throat, blending from the cover's lower edge to the isthmus; starts behind the jaw hinge so it never meets the opening jaw */
-    const m0 = v, MS = 6, MR = 8, ua = Math.max(bm.hingeU + .003, u0 * .85);
-    for (let i = 0; i <= MS; i++) for (let j = 0; j <= MR; j++) {
-      const f = i / MS, jn = j / MR, th = lerp(-1.5707963, -1.12, jn), u = lerp(ua, u1 - .002 + .006 * Math.sin(Math.PI * jn), f);
-      put(u, th, side, .0012 + .0055 * Math.sin(Math.PI * Math.pow(f, .9)) * sstep(0, .22, jn), 3.5, Math.sin(Math.PI * f) * (1 - Math.abs(jn - .5) * 1.2));
-    }
-    for (let i = 0; i < MS; i++) for (let j = 0; j < MR; j++) { const a = m0 + i * (MR + 1) + j, b2 = a + MR + 1; idx.push(a, a + 1, b2, a + 1, b2 + 1, b2); } }
-  const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); geo.setAttribute('aBody', new THREE.Float32BufferAttribute(ab, 4)); geo.setIndex(idx); geo.computeVertexNormals(); return geo;
 }
 // @@PART js/app.part10.js (10/19) lines 1848-2150 of the original module script -- stripped by build.mjs
 function buildJawGeometry(bm) {
@@ -313,33 +271,5 @@ function buildMouthDetails(bm, mats) {
   if (bm.oralDisc) return MOUTH.buildDisc(bm, mats, GH, M);
   if (bm.ventralMouth) return [...MOUTH.buildVentralMouth(bm, mats, GH), ...(bm.law.flat && bm.law.flat.spine ? MOUTH.buildTailSpine(bm, mats, GH) : [])];
   return [...(M.construction === 'fused' ? MOUTH.buildBeak(bm, mats, GH, M) : []), ...(M.construction === 'jawed' ? MOUTH.buildInterior(bm, mats, GH) : [])];
-}
-function buildGills(bm, mats) {
-  const g = bm.g, a = bm.a, pos = [], ab = [], idx = [], p = {}, q = {}; let nv = 0;
-  const slots = g.head.gillSlits || 1;
-  for (const side of [-1, 1]) for (let slot = 0; slot < slots; slot++) {
-    const isCover = a.gills === 'opercular', pores = a.gills === 'pores', ventral = a.gills === 'ventral';
-    const center = isCover ? bm.lm.operculum + .012 : lerp(bm.lm.gillStart, bm.lm.gillEnd, (slot + .5) / slots);
-    const N = pores ? 10 : 14, start = nv;
-    for (let j = 0; j <= N; j++) {
-      const t = j / N;
-      const grade = isCover ? 1 : .62 + .38 * Math.sin(Math.PI * (slot + .5) / slots);          /* graded slit lengths: the middle slit is the longest */
-      let theta = ventral ? -Math.PI / 2 + side * lerp(.06, .06 + .18 * grade, t) : lerp(-.78, .74, t) * g.head.gillHeight * grade;
-      if (!ventral && side < 0) theta = Math.PI - theta;
-      const u = center + g.head.gillSlant * bm.h * .055 * Math.sin(Math.PI * t);
-      const width = bm.h * (pores ? .018 : .012) * Math.pow(Math.sin(Math.PI * t), .6);
-      for (let k = 0; k < 4; k++) {
-        const uu = u + (k - 1.5) * width;
-        bm.rawSurface(uu, theta, p); bm.frame(uu, q);
-        const norm = new THREE.Vector3(); bm.surfaceNormal(uu, theta, norm);
-        const lift = bm.maxD * (k === 0 ? .010 : k === 3 ? .004 : k === 1 ? .0006 : -.0012);      /* front lip raised, throat recessed */
-        pos.push(p.x + norm.x * lift, p.y + norm.y * lift, p.z + norm.z * lift);
-        ab.push(uu, ((theta + Math.PI / 2) / TAU + 1) % 1, k === 1 ? 6.1 : k === 2 ? 6.25 : k === 0 ? 7 : 7.5, Math.sin(Math.PI * t)); nv++;
-      }
-    }
-    for (let j = 0; j < N; j++) for (let k = 0; k < 3; k++) { const v = start + j * 4 + k; idx.push(v, v + 1, v + 4, v + 1, v + 5, v + 4); }
-  }
-  const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); geo.setAttribute('aBody', new THREE.Float32BufferAttribute(ab, 4)); geo.setIndex(idx); geo.computeVertexNormals();
-  const m = new THREE.Mesh(geo, mats.body); m.frustumCulled = false; return m;
 }
 /* fins: ray grid membranes merged into one geometry */

@@ -5,6 +5,8 @@ import { GLTFExporter } from 'three/addons/exporters/GLTFExporter.js';
 import { installProcUI } from './procui.js';
 import * as LAW from './laws.js';
 import * as MOUTH from './mouthgeo.js';
+import * as GILL from './gillgeo.js';
+import { OP } from './headlaw.js';
 import * as TEETHGEO from './teethgeo.js';
 import * as MCHK from './mouthcheck.js';
 import * as APP from './appendages.js';
