@@ -8,7 +8,7 @@ single file being cut off.
 ## Why it looks split
 
 The fish engine is one large ES module. In the original project it was a
-single file, `src/engine/fishgen.js` (535,192 bytes). Here it lives as 19
+single file, `src/engine/fishgen.js` (537,775 bytes). Here it lives as 19
 sequential parts:
 
 ```
@@ -21,16 +21,16 @@ src/engine/parts/fishgen.part06.js   (lines 719–934 of the module)
 src/engine/parts/fishgen.part07.js   (lines 935–1224 of the module)
 src/engine/parts/fishgen.part08.js   (lines 1225–1484 of the module)
 src/engine/parts/fishgen.part09.js   (lines 1485–1771 of the module)
-src/engine/parts/fishgen.part10.js   (lines 1772–2034 of the module)
-src/engine/parts/fishgen.part11.js   (lines 2035–2113 of the module)
-src/engine/parts/fishgen.part12.js   (lines 2114–2438 of the module)
-src/engine/parts/fishgen.part13.js   (lines 2439–2744 of the module)
-src/engine/parts/fishgen.part14.js   (lines 2745–2937 of the module)
-src/engine/parts/fishgen.part15.js   (lines 2938–3117 of the module)
-src/engine/parts/fishgen.part16.js   (lines 3118–3367 of the module)
-src/engine/parts/fishgen.part17.js   (lines 3368–3591 of the module)
-src/engine/parts/fishgen.part18.js   (lines 3592–3738 of the module)
-src/engine/parts/fishgen.part19.js   (lines 3739–3973 of the module)
+src/engine/parts/fishgen.part10.js   (lines 1772–1987 of the module)
+src/engine/parts/fishgen.part11.js   (lines 1988–2066 of the module)
+src/engine/parts/fishgen.part12.js   (lines 2067–2391 of the module)
+src/engine/parts/fishgen.part13.js   (lines 2392–2697 of the module)
+src/engine/parts/fishgen.part14.js   (lines 2698–2890 of the module)
+src/engine/parts/fishgen.part15.js   (lines 2891–3070 of the module)
+src/engine/parts/fishgen.part16.js   (lines 3071–3320 of the module)
+src/engine/parts/fishgen.part17.js   (lines 3321–3544 of the module)
+src/engine/parts/fishgen.part18.js   (lines 3545–3691 of the module)
+src/engine/parts/fishgen.part19.js   (lines 3692–3926 of the module)
 ```
 
 The parts are **one continuous module in filename order** — the `import`
