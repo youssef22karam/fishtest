@@ -1,22 +1,3 @@
-function landmarks3D(bm) { const lm = bm.lm, p = {}, out = []; const spec = { snout: [0.004, 0], mouthCorner: [lm.mouthCorner, 'm'], eye: [lm.eye, 'e'], preopercle: [lm.preopercle, 0], operculum: [lm.operculum, 0], pectoralBase: [lm.pectoralBase, 0], pelvicBase: [lm.pelvicBase, -Math.PI / 2], vent: [lm.vent, -Math.PI / 2], analOrigin: [lm.analOrigin, -Math.PI / 2], analEnd: [lm.analEnd, -Math.PI / 2], dorsalOrigin: [lm.dorsalOrigin, Math.PI / 2], dorsalEnd: [lm.dorsalEnd, Math.PI / 2], peduncleStart: [lm.peduncleStart, Math.PI / 2], caudalBase: [0.999, Math.PI / 2] };
-  const fr = {}, s = {}; for (const k in spec) { const [u, th] = spec[k]; if (th === 'm') { bm.frame(u, fr); bm.section(u, s); const ym = bm.mouthLineY(u, s); out.push({ name: k, x: fr.px + fr.nx * ym, y: fr.py + fr.ny * ym, z: bm.halfWidthAtY(s, ym) }); } else if (th === 'e') { bm.frame(u, fr); bm.section(u, s); out.push({ name: k, x: fr.px + fr.nx * bm.eyeY, y: fr.py + fr.ny * bm.eyeY, z: bm.halfWidthAtY(s, bm.eyeY) }); } else { bm.surface(u, th, p); out.push({ name: k, x: p.x, y: p.y, z: p.z }); } } return out; }
-/**
- * Build a renderable fish from a genome.
- * @returns {{group:THREE.Group, uniforms:Object, materials:Object, bm:BodyModel, info:Object, dispose:()=>void}}
- */
-function buildFish(g, opts = {}) {
-  const q = QUALITY[opts.quality || 'hero'], bm = new BodyModel(g), f = g.fins, lm = bm.lm, maxD = bm.maxD; const geos = [];
-  bm.lod = !q.detail;
-  const bodyGeo = buildBodyGeometry(bm, q.S, q.R); geos.push(bodyGeo);
-  const uni = makeUniforms(g, bm), mats = makeMaterials(g, uni, !!opts.instanced);
-  uni.uDetail.value = q.detail ? 1 : 0;
-  const group = new THREE.Group(); let tris = bodyGeo.index.count / 3; const parts = {};
-  const body = opts.instanced ? new THREE.InstancedMesh(bodyGeo, mats.body, opts.instanced) : new THREE.Mesh(bodyGeo, mats.body); body.frustumCulled = false; group.add(body); parts.body = body;
-  const fb = new FinBuilder(); const rc = n => q.detail ? clamp(Math.round(n), 8, 40) : 5; const sf = d => d.spines / Math.max(1, d.spines + d.rays);
-  if (f.dorsal.present && f.dorsal.count > 0) {
-    if (bm.a.separatedDorsal) {
-      const n = q.detail ? clamp(f.dorsal.spines, 6, 16) : 5;
-      for (let i = 0; i < n; i++) { const s = lerp(lm.dorsalOrigin, lm.dorsalEnd, i / n), e = lerp(lm.dorsalOrigin, lm.dorsalEnd, (i + .65) / n); addRidgeFin(fb, bm, { u0: s, u1: e, height: f.dorsal.height * maxD, sweep: .4, shape: 'triangle', side: 1, rays: 5, spineFrac: .2, opacity: 1, flex: .25, kind: 'dorsal', kindId: 1, K: q.detail ? 3 : 1 }); }
     } else addRidgeFin(fb, bm, { u0: lm.dorsalOrigin, u1: lm.dorsalEnd, height: f.dorsal.height * maxD, sweep: f.dorsal.sweep, shape: f.dorsal.shape, side: 1, rays: rc(f.dorsal.spines + f.dorsal.rays), spineFrac: sf(f.dorsal), opacity: f.dorsal.opacity, flex: f.dorsal.flex, kind: 'dorsal', kindId: 1, K: q.K });
     if (f.dorsal.count >= 2) addRidgeFin(fb, bm, { u0: lm.dorsal2Origin, u1: lm.dorsal2End, height: f.dorsal2.height * maxD, sweep: f.dorsal.sweep, shape: f.dorsal2.shape, side: 1, rays: rc(f.dorsal2.spines + f.dorsal2.rays), spineFrac: sf(f.dorsal2), opacity: f.dorsal.opacity, flex: f.dorsal.flex, kind: 'dorsal', cfg: 'dorsal2', kindId: 1, K: q.K });
     if (f.dorsal.count === 3) addRidgeFin(fb, bm, { u0: lm.dorsal3Origin, u1: lm.dorsal3End, height: f.dorsal3.height * maxD, sweep: .2, shape: f.dorsal3.shape, side: 1, rays: rc(f.dorsal3.rays), spineFrac: 0, opacity: f.dorsal.opacity, flex: f.dorsal.flex, kind: 'dorsal', cfg: 'dorsal3', kindId: 1, K: q.K });
@@ -258,6 +239,7 @@ void main(){ vec3 p = position; vec3 n = normal; float ph = phaseOf();
   applyWave(p, n, ph); mat4 mm = modelM(); vec4 wp = mm*vec4(p,1.0); vWP = wp.xyz; vLP = p; vN = normalize(mat3(mm)*n); vBody = aBody; vCirc=vec2(cos(aBody.y*6.2831853),sin(aBody.y*6.2831853)); gl_Position = projectionMatrix*viewMatrix*wp; }`;
 const FS_BODY = GLSL_COMMON_FS + GLSL_PIGMENT + /* glsl */`
 uniform float uLen,uScaleSize,uIrid,uGloss,uPhoto,uTrans,uHeadU,uPreU,uMouthU,uLateral,uElectric,uDetail,uMouthStart,uMouthTipF,uMouthCornerF,uManta,uJawAngle,uJawOpenMax,uGape,uJawU0,uHingeU; uniform float uMLine[40];
+uniform float uScaleVis,uMatte,uSheen,uDeep; uniform vec3 uIntLip,uIntThroat;
 uniform float uSilver,uLips,uEyeU,uEyeVert,uEyeRU,uEyeRV,uNostrils,uSlits;
 uniform int uScale; varying vec3 vN,vWP,vLP; varying vec4 vBody; varying vec2 vCirc;
 float skinT0(float t){ return (t>2.95 && t<3.3) ? 1.0 : 0.0; }
@@ -345,3 +327,29 @@ void main(){
 #endif
 
   /* screen-space surface frame, reused by every bump layer */
+  vec3 ddx=dFdx(vWP), ddy=dFdy(vWP), r1=cross(ddy,N), r2=cross(N,ddx); float det=dot(ddx,r1);
+  float relief=uLen*.0015;
+
+  if(uManta<.5 && skinT && u>=uMouthStart && u<=uMouthU){
+    float t=smoothstep(uMouthStart,uMouthU,u);
+    float level=mix(uMouthTipF,uMouthCornerF,t)-.025*sin(3.14159265*t);
+    float fade=smoothstep(uMouthStart,uMouthStart+.012,u)*(1.0-smoothstep(uMouthU-.014,uMouthU,u));
+    float crease=exp(-pow((vert-level)/(.023+min(uJawAngle,.08)*.1),2.0))*fade;
+    col=mix(col,uBase*.22,crease*.72);
+    col=mix(col,mix(col,vec3(.62,.42,.40),.35),(exp(-pow((vert-level-.06)/.05,2.0))+exp(-pow((vert-level+.06)/.05,2.0)))*fade*uLips*.6);
+  }
+
+  /* round 4: STATION-GRADED scale field. Rows are lines of constant circumferential angle (they follow the body axis / lateral line); along the body the scale length is
+     graded by an exactly integrated density rho(t)=1.7-1.05 sin(pi t): small toward head and tail, largest mid-flank; around the section the row pitch is denser dorsally and
+     ventrally than on the flank. The free edge always points tailward (head-ward overlap). Everything lives in body space, so nothing crawls under the swim wave. */
+  float st0=uHeadU*.45, span=max(.2,1.0-st0), tb=clamp((u-st0)/span,0.0,1.0), phiS=ang*6.2831853;
+  float gx=1.7*tb-1.05*(1.0-cos(3.14159265*tb))/3.14159265+1.7*min(0.0,(u-st0)/span);
+  float gy=(phiS+.225*sin(2.0*phiS))/6.2831853;
+  vec2 sc=vec2(gx*span*uFineness*34.0, gy*27.0*(1.0+.22*uFineness))/uScaleSize;
+  if(uScale==3) sc*=2.2; if(uScale==5) sc*=.5;
+  float capK=smoothstep(.004,.03,u);                                          /* round 4: angular detail fades in over the snout cap — no clamped-u speckle patch, no seam */
+  float fw=length(fwidth(sc)), visible=(1.0-smoothstep(.4,1.7,fw))*uScaleVis*capK;
+  gCirc=(1.0-smoothstep(.05,.22,fw))*uDetail*capK;
+  gFine=(1.0-smoothstep(.0018,.0065,fwidth(u)))*uDetail*capK;
+  float h=scaleHeight(sc), guan=0.0;
+  if(uDetail>.4 && skinT && uScale!=4 && uScale!=6){

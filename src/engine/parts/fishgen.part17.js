@@ -1,3 +1,9 @@
+  const R = roleOf(g), P = AX(g), role = R.top, plan = planOf(g), upright = plan === 'upright';
+  const H = { dark: clamp(1 - Math.pow(hab.light, .35), 0, 1), deep: hab.tags.includes('deep'), cold: hab.tags.includes('cold') || ['abyssal', 'hadal'].includes(hab.id), flow: { fastRiver: 1, mountainStream: 1, slowRiver: .3, rockyShore: .5, kelpForest: .25 }[hab.id] || 0,
+    cover: ['coralReef', 'kelpForest', 'mangrove', 'floodplain', 'blackwater', 'crystalCavern', 'deepReef', 'rockyShore', 'seagrass'].includes(hab.id), open: hab.floor === false, bottom: hab.tags.includes('benthic') || ['abyssal', 'hadal', 'sandFlat', 'cave', 'deepReef'].includes(hab.id), turbid: hab.fog > .1 && hab.light < .7 && !hab.fantasy };
+  notes.push(`Ecological role here: ${ROLE_TXT[role]}${R.second !== role ? ', with ' + ROLE_TXT[R.second] + ' tendencies' : ''}.`);
+  if (H.dark > .25) {
+    if (['bottom', 'grazer', 'ribbon', 'armor'].includes(role) || tag.has('cave')) { M('head.eyeSize', 1 - .55 * H.dark); S('skin.lateralLine', 1); if (!['beak', 'tube'].includes(g.mouth.type)) { Dd('head.barbels', Math.round(2 * H.dark)); S('head.barbelLen', Math.max(g.head.barbelLen, .6)); } if (H.dark > .9 && tag.has('cave')) S('head.eyeSide', 'none'); notes.push('Little light reaches the bottom: eyes shrink while a full lateral line and barbels take over sensing.'); }
     else if (role === 'ambush' && H.dark > .55 && !upright) { S('head.special', 'esca'); S('head.specialLen', .22 + .4 * P.pred); S('head.specialWidth', .05); S('skin.photophores', Math.max(g.skin.photophores, 10)); S('skin.glow', [185, .9, .65]); M('mouth.gape', 1.2); if (!['beak', 'tube'].includes(g.mouth.type)) { S('mouth.teeth', 'needle'); S('mouth.teethCount', Math.max(g.mouth.teethCount, 30)); } notes.push('Sit-and-wait predator in the dark: a glowing lure, a wider gape and needle teeth.'); }
     else if (role === 'hunter' && H.dark > .45) { M('head.eyeSize', 1 + .6 * H.dark); M('mouth.gape', 1 + .35 * H.dark); if (!['beak', 'tube'].includes(g.mouth.type)) S('mouth.teeth', 'fang'); S('skin.photophores', Math.round(14 + 30 * H.dark)); S('skin.glow', [rng.range(185, 215), 1, .62]); S('skin.iridescence', 0); Lm('skin.base', .55); notes.push('Dark-water hunter: huge light-gathering eyes, fang-like teeth and a row of belly photophores.'); }
     else if (H.dark > .35) { S('skin.photophores', Math.round(18 + 40 * H.dark * (1 - P.armor * .6))); S('skin.glow', [rng.range(185, 215), 1, .62]); M('head.eyeSize', 1 + .7 * H.dark); S('skin.countershade', .3); Lm('skin.base', .6); notes.push('Counter-illumination: belly light organs match the faint glow from above, and the eyes grow large.'); }
@@ -139,18 +145,3 @@ function evDonor(c, st, rng, X, mag) {
   for (const [id, kind] of ORGAN_DEFS) {
     if (id === 'gills' || !(id in dn.th)) continue; if (kind === 'struct' && !compat) continue; if (id === 'jaw' && ['upright', 'pipe'].includes(cp)) continue;
     const p0 = dn.prog[id] || 0; if (a1 >= 1 && p0 >= .99 && p0 < 1) { dn.prog[id] = 1; continue; } let p1 = a1 >= 1 ? 1 : easeP((a1 - dn.th[id] + W) / (2 * W)); if (p1 <= p0 + .004) continue;
-    let f = p0 >= 1 ? 1 : (p1 - p0) / (1 - p0); const gap = gapOf(c, p => getP(D, p), new Set(ORG_PATHS[id])); if (gap > 0) f = Math.min(f, Math.max(.07, STEP_LIM / gap)); if (p0 < 1) p1 = p0 + f * (1 - p0);
-    const flip = (p1 >= .5 && p0 < .5) || p1 >= .999; if (p1 >= .999) p1 = 1;
-    for (const p of ORG_PATHS[id]) {
-      if (p === 'body.length') continue;
-      const e = SCHEMA[p], cv = getP(c, p), dv = getP(D, p);
-      if (e.t === 'n' || e.t === 'i') setN(c, p, blendN(p, cv, dv, f)); else if (e.t === 'hsl') setP(c, p, mixC(cv, dv, f)); else if (flip) setP(c, p, cp3(dv));
-    }
-    if (id === 'body') { dn.L0 = dn.L0 || c.body.length; const target = Math.exp(lerp(Math.log(dn.L0), Math.log(D.body.length), p1)); setN(c, 'body.length', clamp(target, c.body.length / 1.4, c.body.length * 1.4)); }
-    dn.prog[id] = p1; moved.push({ id, p0, p1, flip });
-  }
-  }
-  dn.anc = a1; const finished = a1 >= 1 && adopt.every(id => (dn.prog[id] || 0) >= .99); if (finished) { dn.done = true; dn.anc = 1; }
-  if (!moved.length) return finished ? { kind: 'gene flow', title: 'Gene flow complete (100%)', lines: ['Every adoptable organ now matches ' + cleanName(D.meta.name) + '.'] } : null;
-  moved.sort((x, y) => (y.p1 - y.p0) - (x.p1 - x.p0));
-  lines.push(`Donor ancestry ${pct(a0)}% → ${pct(a1)}%.`);

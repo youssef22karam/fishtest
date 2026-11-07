@@ -1,3 +1,7 @@
+    body.querySelector('#expShare').onclick = async () => { updateHash(); const url = location.href; try { await navigator.clipboard.writeText(url); toast('Share link copied'); } catch (e) { prompt('Copy this link', url); } };
+    body.querySelector('#expGlb').onclick = () => exportGLB(name);
+    body.querySelector('#impJson').onchange = ev => { const file = ev.target.files[0]; if (!file) return; const rd = new FileReader(); rd.onload = () => { try { const { genome, issues } = validateGenome(JSON.parse(rd.result)); genome.meta.repairs = issues.map(i => ({ rule: 'schema_validate', path: '-', from: '-', to: i })); genome.meta.edited = true; finalize(genome); syncSelects(genome); setFish(genome); toast(`Imported (${issues.length} schema fixes, ${genome.meta.repairs.length} total repairs)`); } catch (e) { toast('Import failed: ' + e.message); } }; rd.readAsText(file); };
+  },
   debug(body) {
     const g = App.genome, f = App.fish; if (!g || !f) { body.textContent = 'No fish.'; return; } const d = App.debug;
     const m = g.meta.metrics || metrics(g); const fa = m.finAreaFractions; const viol = violations(g);
@@ -243,19 +247,3 @@ async function runSelfTest(out, prog, exhaustive = false) {
         if (violations(evolved).length) { row.fail++; issues.push(`${hid}: mutation constraints failed (${g.meta.clade})`); }
         if (i % 20 === 0) { prog.textContent = `${HABITATS[hid].n}: ${i + 1}/200`; show(); await yieldFrame(); }
       }
-      show(); if (TEST_STATE.cancel) break;
-    }
-    if (!TEST_STATE.cancel) {
-      const row = { name: 'All reference species', n: 0, m: 0, geo: 0, hero: 0, lod: 0, fail: 0 }; rows.push(row);
-      for (const sp of SPECIES) {
-        if (TEST_STATE.cancel) break;
-        const g = generate({ species: sp.id, seed: 'reference-anatomy' }); testGenome(g, row, true);
-        const a = anatomyProfile(g), locks = a.locks;
-        if (Object.keys(locks).some(p => getP(g, p) !== locks[p])) { row.fail++; issues.push(sp.n + ': lineage architecture failed'); }
-        const again = generate({ species: sp.id, seed: 'reference-anatomy' });
-        if (JSON.stringify(stripGenome(g)) !== JSON.stringify(stripGenome(again))) { row.fail++; issues.push(sp.n + ': generation is not deterministic'); }
-        const mutant = mutate(g, .7, 'breed-' + sp.id), offspring = breed(g, mutant, 'cross-' + sp.id); row.m++;
-        if (violations(offspring).length) { row.fail++; issues.push(sp.n + ': crossover rules failed'); }
-        prog.textContent = 'Reference anatomy: ' + sp.n; show(); await yieldFrame();
-      }
-    }

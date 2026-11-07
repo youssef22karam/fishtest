@@ -1,23 +1,4 @@
-  vec3 ddx=dFdx(vWP), ddy=dFdy(vWP), r1=cross(ddy,N), r2=cross(N,ddx); float det=dot(ddx,r1);
-  float relief=uLen*.0015;
-
-  if(uManta<.5 && skinT && u>=uMouthStart && u<=uMouthU){
-    float t=smoothstep(uMouthStart,uMouthU,u);
-    float level=mix(uMouthTipF,uMouthCornerF,t)-.025*sin(3.14159265*t);
-    float fade=smoothstep(uMouthStart,uMouthStart+.012,u)*(1.0-smoothstep(uMouthU-.014,uMouthU,u));
-    float crease=exp(-pow((vert-level)/(.023+min(uJawAngle,.08)*.1),2.0))*fade;
-    col=mix(col,uBase*.22,crease*.72);
-    col=mix(col,mix(col,vec3(.62,.42,.40),.35),(exp(-pow((vert-level-.06)/.05,2.0))+exp(-pow((vert-level+.06)/.05,2.0)))*fade*uLips*.6);
-  }
-
-  vec2 sc=vec2(u*uFineness*34.0,ang*27.0*(1.0+.22*uFineness))/uScaleSize;
-  if(uScale==3) sc*=2.2; if(uScale==5) sc*=.5;
-  float fw=length(fwidth(sc)), visible=1.0-smoothstep(.4,1.7,fw);
-  gCirc=(1.0-smoothstep(.05,.22,fw))*uDetail;
-  gFine=(1.0-smoothstep(.0018,.0065,fwidth(u)))*uDetail;
-  float h=scaleHeight(sc), guan=0.0;
-  if(uDetail>.4 && skinT && uScale!=4 && uScale!=6){
-    float scaleFade=uScale==3 ? 1.0 : smoothstep(uHeadU*.55,uHeadU,u);
+    float scaleFade=mix(.3,1.0,smoothstep(0.0,uHeadU*1.15,u));   /* round 4: head carries the same scale field, graded by station */
     float hx=scaleHeight(sc+dFdx(sc))-h, hy=scaleHeight(sc+dFdy(sc))-h;
     float scaleRelief=uScale==3 ? .00035 : uScale==2 || uScale==5 ? .0015 : .0011;
     vec3 grad=sign(det)*(hx*r1+hy*r2)*(uLen/max(1.25,uFineness))*scaleRelief*uScaleSize*visible*scaleFade*1.5;
@@ -31,13 +12,13 @@
 
   /* skin relief that is not scales: pebbling, lips, orbit, opercle, nares */
   if(uDetail>.4 && (tissue<2.0 || skinT)){
-    float mh=microH(u,vert,head);
+    float mh=microH(u,vert,head*capK);
     vec3 mgrad=sign(det)*(dFdx(mh)*r1+dFdy(mh)*r2)*relief;
     N=normalize(max(abs(det),1e-12)*N-mgrad);
     col*=1.0+.10*clamp(mh,-1.0,1.0)*head;
     /* round 2.1: no periorbital ring. The skin simply darkens in the last fraction before the eyeball (d ≈ distance from the eye centre in eye radii; the skin-blend cap spans d .6–1.2) */
     float dEy=uEyeRU>0.0 ? length(vec2((u-uEyeU)/max(1e-4,uEyeRU),(abs(vert)-abs(uEyeVert))/max(1e-4,uEyeRV))) : 9.0;
-    col*=1.0-.42*(1.0-smoothstep(.62,.98,dEy));
+    col*=1.0-.22*(1.0-smoothstep(.55,1.0,dEy));   /* round 4: lighter, so the body pattern reads straight across the eye-blend patch */
     float behind=smoothstep(uHeadU-.001,uHeadU+.0015,u)*(1.0-smoothstep(uHeadU+.002,uHeadU+.016,u))*(1.0-skinT0(tissue));
     col*=1.0-.40*behind;                                                     /* soft shadow the free margin casts on the trunk */
     col*=1.0-.34*smoothstep(.45,1.0,rimK);                                   /* fine tapered rim of the cover */
@@ -66,8 +47,9 @@
   rough*=1.0+.22*head-.10*(1.0-smoothstep(-.7,-.1,vert));      /* head duller, belly slicker */
   rough+=(tone2-.5)*.10*visible;
   rough-=guan*.08;
+  rough=mix(rough,rough*1.4+.1,uMatte); rough*=1.0-.2*uSheen;        /* round 4: wet sheen on cruisers / surface plans, matte on deep-band and benthic plans */
   float metal=clamp(uSilver*guan*1.15,0.0,.85)*(1.0-head*.55);
-  float coat=mix(.45,1.0,uWet)*(1.0-.25*head);
+  float coat=mix(.45,1.0,uWet)*(1.0-.25*head)*(1.0-.55*uMatte+.12*uSheen);
   float sss=uTrans*.9+.12;
   bool inner=tissue>.5 && tissue<2.0;
   if(inner){ rough=.78; metal=0.0; coat=.2; sss=.3; }
@@ -86,7 +68,10 @@
     c+=uGlow*dotp*step(uHeadU,u)*step(u,.99)*( .85+.15*sin(uTime*2.5+floor(pu)))*1.7;
   }
   if(uElectric>.5) c+=vec3(.2,.35,.65)*uElectric*pow(max(0.0,sin(uTime*5.0+u*16.0)),24.0)*smoothstep(.3,.8,u)*.14;
-  if(cav) c=mix(c,col*.35,.75);
+  if(tissue>.5 && tissue<2.0){   /* round 4: interior tone = depth gradient (vBody.y = baked occlusion: throat 1, lips ~.2), palette/band derived, mostly unlit so no lit strip can read as a divider */
+    float occ=clamp(vBody.y,0.0,1.0); vec3 tn=mix(uIntLip,uIntThroat,smoothstep(.0,.9,occ));
+    if(tissue>1.4 && tissue<1.6) tn=mix(uIntLip*1.3,uIntThroat,smoothstep(.2,1.0,occ)*.7); else if(tissue>1.2 && tissue<1.3) tn*=.7;
+    tn*=.9+.2*fbm(vec2(u*40.0,occ*20.0)+uSeed); c=tn+c*.10*(1.0-.5*occ); }
   c=mix(c,uFogCol,fogAmt(vWP)); gl_FragColor=vec4(c,mix(1.0,.86,uTrans));
 }`;
 const VS_FIN = GLSL_SWIM + /* glsl */`
@@ -124,7 +109,7 @@ void main(){ float rayT = vFin.x, lenT = vFin.y, op = vFin2.x, memb = vFin2.y, s
   float branch=1.0-smoothstep(.055,.12,abs(fract(rayT*(R-1.0)*2.0+.5)-.5));
   ray=mix(ray,max(ray*.55,branch*.65),smoothstep(.55,.86,lenT)*(1.0-isSpine));
   if(lenT > memb && ray < .55 && vSkin.z<.5) discard;
-  float root=1.0-smoothstep(.06,.42,lenT), ang=fract(atan(vCirc.y,vCirc.x)/6.2831853+1.0);
+  float root=1.0-smoothstep(.08,.62,lenT), ang=fract(atan(vCirc.y,vCirc.x)/6.2831853+1.0);
   vec3 skin=skinPigment(vSkin.x,ang), col=mix(uFinCol,skin,root);
   /* membrane: collagen fibre sheen between the rays, pigment blotches and a clearer distal margin */
   float fibre=.94+.06*sin(rayT*R*18.0+lenT*9.0);
@@ -242,12 +227,15 @@ function makeUniforms(g, bm) {
   const eyeRU = g.head.eyeSide === 'none' ? 0 : bm.eyeR / Math.max(1e-6, bm.L);
   const eyeRV = g.head.eyeSide === 'none' ? 0 : clamp(bm.eyeR / Math.max(1e-6, (es.dUp + es.dDn) * .5), .02, .9);
   const silver = clamp(s.iridescence * .8 + (1 - s.base[1]) * .5 * (s.scale === 'bare' || s.scale === 'denticle' ? .2 : 1), 0, .92);
+  const SK = skinLaw(axesOf(g), g), dp = (c, k = 1) => { const l = (c.r * .3 + c.g * .59 + c.b * .11); c.r = (l + (c.r - l) * (1 - .5 * SK.deep)) * (1 - .4 * SK.deep) * k; c.g = (l + (c.g - l) * (1 - .5 * SK.deep)) * (1 - .4 * SK.deep) * k; c.b = (l + (c.b - l) * (1 - .5 * SK.deep)) * (1 - .4 * SK.deep) * k; return c; };
+  const cBase = dp(hslCol(s.base)), cBelly = dp(hslCol(s.belly)), cAcc = dp(hslCol(s.accent)), cFin = dp(hslCol(s.base).lerp(hslCol(s.belly), .38).lerp(hslCol(s.fin), .25), .96);   /* round 4: fin membrane tone derives from the body palette */
   return Object.assign({}, ENV, {
+    uScaleVis: { value: SK.scaleVis }, uMatte: { value: SK.matte }, uSheen: { value: SK.sheen }, uDeep: { value: SK.deep }, uIntLip: { value: new THREE.Color(...SK.lip) }, uIntThroat: { value: new THREE.Color(...SK.throat) },
     uSilver: { value: silver }, uEyeU: { value: lm.eye }, uEyeVert: { value: eyeVert }, uEyeRU: { value: eyeRU }, uEyeRV: { value: eyeRV },
     uLen: { value: bm.L }, uHeadX: { value: bm.headX }, uFreq: { value: g.swim.freq }, uAmp: { value: g.swim.amp }, uAmpHead: { value: g.swim.ampHead }, uEnvPow: { value: g.swim.envPow }, uWaveK: { value: g.swim.waveK }, uMode: { value: Math.max(0, SWIM_MODES.indexOf(g.swim.mode)) }, uFlap: { value: FLAP[g.swim.mode] || 0.2 }, uPecA: { value: new THREE.Vector4(0, 0, bm.law.pec.restAbd * Math.PI / 180, 0) }, uPecB: { value: new THREE.Vector4(0, 0, bm.law.pec.restAbd * Math.PI / 180, 0) }, uPecP: { value: new THREE.Vector4(0, 0, bm.law.pec.lagDeg * Math.PI / 180, bm.law.pec.restAbd * Math.PI / 180) }, uPecDisc: { value: bm.a.family === 'ray' ? 1 : 0 }, uDiscAmp: { value: 0 }, uDiscK: { value: 2 * Math.PI / .6 },
     uCycle: { value: 0 }, uFlat: { value: g.body.roll === 0 ? 0 : 1 }, uRay: { value: bm.a.family === 'ray' ? 1 : 0 }, uManta: { value: bm.ventralMouth ? 1 : 0 }, uGape: { value: g.mouth.gape }, uDetail: { value: 1 }, uCartilage: { value: bm.a.gills === 'lateral' ? 1 : 0 },
     uBreath: { value: 0 }, uInflate: { value: 0 }, uJawAngle: { value: 0 }, uJawPivot: { value: new THREE.Vector2(bm.headX, 0) }, uJawOpenMax: { value: 0.3 }, uJawSpread: { value: 0 }, uJawU0: { value: MOUTH.jawU0(bm) }, uHingeU: { value: MOUTH.jawU1(bm) }, uMLine: { value: MOUTH.edgeTable(bm, GH) }, uJawProtrude: { value: 0 }, uPhase: { value: 0 }, uBurst: { value: 0 },
-    uBase: { value: hslCol(s.base) }, uBelly: { value: hslCol(s.belly) }, uAccent: { value: hslCol(s.accent) }, uFinCol: { value: hslCol(s.fin) }, uEyeCol: { value: hslCol(s.eye) }, uGlow: { value: hslCol(s.glow) }, uBand: { value: s.band }, uBandCol: { value: hslCol(s.bandColor) },
+    uBase: { value: cBase }, uBelly: { value: cBelly }, uAccent: { value: cAcc }, uFinCol: { value: cFin }, uEyeCol: { value: hslCol(s.eye) }, uGlow: { value: hslCol(s.glow) }, uBand: { value: s.band }, uBandCol: { value: hslCol(s.bandColor) },
     uPattern: { value: Math.max(0, SCHEMA['skin.pattern'].opts.indexOf(s.pattern)) }, uPatScale: { value: s.patternScale }, uPatStrength: { value: s.patternStrength }, uScale: { value: Math.max(0, SCHEMA['skin.scale'].opts.indexOf(s.scale)) }, uScaleSize: { value: s.scaleSize },
     uCounter: { value: s.countershade }, uIrid: { value: s.iridescence }, uGloss: { value: s.gloss }, uPhoto: { value: s.photophores }, uTrans: { value: s.translucency }, uSlits: { value: g.head.gillSlits }, uHeadU: { value: lm.operculum }, uPreU: { value: lm.preopercle }, uMouthU: { value: lm.mouthCorner },
     uLateral: { value: s.lateralLine }, uLips: { value: g.mouth.lips }, uNostrils: { value: g.head.nostrils }, uMouthStart: { value: bm.jawStartU }, uMouthTipF: { value: bm.tipF }, uMouthCornerF: { value: bm.cornerF }, uElectric: { value: s.electric ? 1 : 0 }, uSeed: { value: (cyrb128(String(g.meta.surfaceSeed || g.meta.seed))[0] % 1000) / 37 }, uFineness: { value: g.body.fineness }, uColor: { value: hslCol([s.base[0], s.base[1] * 0.6, s.base[2] * 0.75]) }, uSacc: { value: new THREE.Vector2() }, uPupil: { value: 0 }
@@ -313,9 +301,3 @@ void main(){ vec2 p = vWP.xz/uScale; float n = fbm(p*0.8); vec3 col = uColor*(0.
 }`;
 const VS_FLOOR = /* glsl */`varying vec3 vWP; varying vec2 vUv; void main(){ vUv = uv; vec4 wp = modelMatrix*vec4(position,1.0); vWP = wp.xyz; gl_Position = projectionMatrix*viewMatrix*wp; }`;
 const VS_PART = /* glsl */`uniform float uTime, uScale, uSize; attribute float aSeed; varying float vA; void main(){ vec3 p = position; p.y = mod(p.y + uTime*0.02*uScale*(0.5+aSeed), 12.0*uScale) - 6.0*uScale; p.x += sin(uTime*0.3+aSeed*6.28)*0.2*uScale; vec4 mv = modelViewMatrix*vec4(p,1.0); gl_PointSize = uSize*(0.5+aSeed) / max(0.1,-mv.z) ; vA = 0.4+0.6*aSeed; gl_Position = projectionMatrix*mv; }`;
-const FS_PART = /* glsl */`uniform vec3 uFogCol; varying float vA; void main(){ float d = length(gl_PointCoord-0.5); float a = (1.0-smoothstep(0.2,0.5,d))*0.5*vA; gl_FragColor = vec4(mix(uFogCol, vec3(1.0), 0.6), a); }`;
-const FS_SHAFT = /* glsl */`uniform float uI; varying vec2 vUv; void main(){ float a = (1.0-smoothstep(0.0,1.0,abs(vUv.x*2.0-1.0)))*(1.0-vUv.y)*(vUv.y)*uI; gl_FragColor = vec4(vec3(1.0,0.97,0.85), a*0.35); }`;
-const VS_SHAFT = /* glsl */`varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix*modelViewMatrix*vec4(position,1.0); }`;
-function disposeObject(o) { o.traverse(c => { if (c.geometry) c.geometry.dispose(); if (c.material) { const ms = Array.isArray(c.material) ? c.material : [c.material]; ms.forEach(m => m.dispose()); } }); }
-function propMaterial(color, emissive) { return new THREE.MeshLambertMaterial({ color, emissive: emissive || 0x000000, emissiveIntensity: emissive ? 1.2 : 0 }); }
-function makeProp(type, rng, es) {

@@ -1,3 +1,9 @@
+const FS_PART = /* glsl */`uniform vec3 uFogCol; varying float vA; void main(){ float d = length(gl_PointCoord-0.5); float a = (1.0-smoothstep(0.2,0.5,d))*0.5*vA; gl_FragColor = vec4(mix(uFogCol, vec3(1.0), 0.6), a); }`;
+const FS_SHAFT = /* glsl */`uniform float uI; varying vec2 vUv; void main(){ float a = (1.0-smoothstep(0.0,1.0,abs(vUv.x*2.0-1.0)))*(1.0-vUv.y)*(vUv.y)*uI; gl_FragColor = vec4(vec3(1.0,0.97,0.85), a*0.35); }`;
+const VS_SHAFT = /* glsl */`varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix*modelViewMatrix*vec4(position,1.0); }`;
+function disposeObject(o) { o.traverse(c => { if (c.geometry) c.geometry.dispose(); if (c.material) { const ms = Array.isArray(c.material) ? c.material : [c.material]; ms.forEach(m => m.dispose()); } }); }
+function propMaterial(color, emissive) { return new THREE.MeshLambertMaterial({ color, emissive: emissive || 0x000000, emissiveIntensity: emissive ? 1.2 : 0 }); }
+function makeProp(type, rng, es) {
   const g = new THREE.Group(); const sc = es * rng.range(0.6, 1.4);
   const jitter = geo => { const p = geo.getAttribute('position'); for (let i = 0; i < p.count; i++) { const k = 1 + (rng.next() - 0.5) * 0.35; p.setXYZ(i, p.getX(i) * k, p.getY(i) * k, p.getZ(i) * k); } geo.computeVertexNormals(); return geo; };
   switch (type) {
@@ -185,10 +191,3 @@ function animate(now) {
       f.group.position.y = reducedMotion || restPose ? 0 : Math.sin(t * .6) * L * .015; f.group.rotation.y = reducedMotion || restPose ? 0 : Math.sin(u.uCycle.value * TAU) * .012 * (1 + b);
     }
     if (App.school && App.schoolOn && dt > 0) App.school.update(dt, t);
-    if (App.env && App.env.shafts && App.env.shafts.visible) for (const m of App.env.shafts.children) m.rotation.y = Math.atan2(camera.position.x - m.position.x, camera.position.z - m.position.z);
-    if (App.cameraTween) { const v = App.cameraTween, q = clamp((now - v.start) / v.duration, 0, 1), ease = smoother(q); camera.position.lerpVectors(v.from, v.to, ease); controls.target.lerpVectors(v.startTarget, v.target, ease); if (q === 1) { App.cameraTween = null; controls.enableDamping = true; } }
-    controls.update(); renderer.render(scene, camera);
-  } catch (e) { showError(e); }
-}
-/* ╔══════════════════════════════════════════════════════════════════╗
-   ║ 11. UI, PANELS, EXPORT, SELF-TEST, BOOT                          ║

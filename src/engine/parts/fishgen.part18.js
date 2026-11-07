@@ -1,3 +1,18 @@
+    let f = p0 >= 1 ? 1 : (p1 - p0) / (1 - p0); const gap = gapOf(c, p => getP(D, p), new Set(ORG_PATHS[id])); if (gap > 0) f = Math.min(f, Math.max(.07, STEP_LIM / gap)); if (p0 < 1) p1 = p0 + f * (1 - p0);
+    const flip = (p1 >= .5 && p0 < .5) || p1 >= .999; if (p1 >= .999) p1 = 1;
+    for (const p of ORG_PATHS[id]) {
+      if (p === 'body.length') continue;
+      const e = SCHEMA[p], cv = getP(c, p), dv = getP(D, p);
+      if (e.t === 'n' || e.t === 'i') setN(c, p, blendN(p, cv, dv, f)); else if (e.t === 'hsl') setP(c, p, mixC(cv, dv, f)); else if (flip) setP(c, p, cp3(dv));
+    }
+    if (id === 'body') { dn.L0 = dn.L0 || c.body.length; const target = Math.exp(lerp(Math.log(dn.L0), Math.log(D.body.length), p1)); setN(c, 'body.length', clamp(target, c.body.length / 1.4, c.body.length * 1.4)); }
+    dn.prog[id] = p1; moved.push({ id, p0, p1, flip });
+  }
+  }
+  dn.anc = a1; const finished = a1 >= 1 && adopt.every(id => (dn.prog[id] || 0) >= .99); if (finished) { dn.done = true; dn.anc = 1; }
+  if (!moved.length) return finished ? { kind: 'gene flow', title: 'Gene flow complete (100%)', lines: ['Every adoptable organ now matches ' + cleanName(D.meta.name) + '.'] } : null;
+  moved.sort((x, y) => (y.p1 - y.p0) - (x.p1 - x.p0));
+  lines.push(`Donor ancestry ${pct(a0)}% → ${pct(a1)}%.`);
   for (const m of moved.slice(0, 3)) lines.push(`${ORGAN_LABEL[m.id]} ${pct(m.p0)}% → ${pct(m.p1)}% of ${cleanName(D.meta.name)}${m.p1 >= 1 ? ' (fixed)' : m.flip && m.p0 < .5 ? ' (discrete traits switch)' : ''}`);
   if (moved.length > 3) lines.push(`${moved.length - 3} more organs shifting.`);
   return { kind: 'gene flow', title: 'Gene flow from ' + cleanName(D.meta.name) + ' (' + pct(a1) + '%)', lines };
@@ -218,20 +233,3 @@ function sanitizeMetaExtras(src, dst) {
     if (e.don && typeof e.don === 'object' && typeof e.don.val === 'string') { o.don = { val: str(e.don.val, 64), seed: str(e.don.seed, 32), done: e.don.done === true, L0: isn(e.don.L0) ? clamp(e.don.L0, 0, 40) : 0, anc: isn(e.don.anc) ? clamp(e.don.anc, 0, 1) : 0, th: null, prog: {} }; for (const k in e.don.prog || {}) if (ORGAN_KIND[k] && isn(e.don.prog[k])) o.don.prog[k] = clamp(e.don.prog[k], 0, 1); }
     if (e.hab && typeof e.hab === 'object' && HABITATS[e.hab.id]) { const a = e.hab.adapted; o.hab = { id: e.hab.id, p: isn(e.hab.p) ? clamp(e.hab.p, 0, 1) : 0, seed: str(e.hab.seed, 16), t: sparse(e.hab.t), notes: strs(e.hab.notes, 40, 260), base: e.hab.base ? sparse(e.hab.base) : null, adapted: a && HABITATS[a.from] && HABITATS[a.to] ? { from: a.from, to: a.to, speculative: a.speculative === true } : null }; }
     if (e.last && typeof e.last.id === 'string') o.last = { id: str(e.last.id, 32), dir: e.last.dir === -1 ? -1 : 1 };
-    o.log = (Array.isArray(e.log) ? e.log : []).slice(-8).map(x => ({ n: Math.round(clamp(Number(x && x.n) || 0, 0, 100000)), k: str(x && x.k, 16), t: str(x && x.t, 120), l: strs(x && x.l, 3, 150) }));
-    dst.evo = o;
-  }
-}
-
-/** share-URL payload: drops derived data that the engine can regenerate (reports, notes, mutation diff, long logs, habitat target tables) */
-function slimGenome(g) {
-  const c = stripGenome(g), m = c.meta; delete m.mutation; delete m.notes; delete m.adaptBase;
-  if (m.hybrid) { m.hybrid.syn = (m.hybrid.syn || []).slice(0, 6).map(s => ({ id: s.id, t: String(s.t).slice(0, 200) })); delete m.hybrid.chain; }
-  if (m.evo) { m.evo.log = (m.evo.log || []).slice(-2).map(e => ({ n: e.n, k: e.k, t: e.t, l: (e.l || []).slice(0, 1) })); if (m.evo.hab) { delete m.evo.hab.t; delete m.evo.hab.notes; delete m.evo.hab.base; } if (m.evo.don) { delete m.evo.don.th; } }
-  return c;
-}
-
-/* ── regression tests for the hybrid + evolution engines (run from the Tests tab) ── */
-// @@PART js/app.part19.js (19/19) lines 3750-3821 of the original module script -- stripped by build.mjs
-function runHybridTests(test, assert) {
-  const sp = (id, hab) => generate({ species: id, habitat: hab || SPECIES.find(s => s.id === id).habitat, seed: 'ht', noAdapt: true });

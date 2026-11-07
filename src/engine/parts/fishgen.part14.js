@@ -1,3 +1,10 @@
+    if (App.env && App.env.shafts && App.env.shafts.visible) for (const m of App.env.shafts.children) m.rotation.y = Math.atan2(camera.position.x - m.position.x, camera.position.z - m.position.z);
+    if (App.cameraTween) { const v = App.cameraTween, q = clamp((now - v.start) / v.duration, 0, 1), ease = smoother(q); camera.position.lerpVectors(v.from, v.to, ease); controls.target.lerpVectors(v.startTarget, v.target, ease); if (q === 1) { App.cameraTween = null; controls.enableDamping = true; } }
+    controls.update(); renderer.render(scene, camera);
+  } catch (e) { showError(e); }
+}
+/* ╔══════════════════════════════════════════════════════════════════╗
+   ║ 11. UI, PANELS, EXPORT, SELF-TEST, BOOT                          ║
    ╚══════════════════════════════════════════════════════════════════╝ */
 const $ = id => document.getElementById(id);
 let toastTimer = 0; function toast(msg) { const t = $('toast'); t.textContent = msg; t.style.opacity = 1; clearTimeout(toastTimer); toastTimer = setTimeout(() => { t.style.opacity = 0; }, 2600); }
@@ -171,7 +178,3 @@ const PANELS = {
     body.querySelector('#expPreview').textContent = JSON.stringify(stripGenome(g), null, 1).slice(0, 4000) + '\n…';
     body.querySelector('#expJson').onclick = () => download(new Blob([JSON.stringify(stripGenome(g), null, 2)], { type: 'application/json' }), name + '.json');
     body.querySelector('#expPng').onclick = () => { renderer.render(scene, camera); const url = renderer.domElement.toDataURL('image/png'); const a = document.createElement('a'); a.href = url; a.download = name + '.png'; a.click(); };
-    body.querySelector('#expShare').onclick = async () => { updateHash(); const url = location.href; try { await navigator.clipboard.writeText(url); toast('Share link copied'); } catch (e) { prompt('Copy this link', url); } };
-    body.querySelector('#expGlb').onclick = () => exportGLB(name);
-    body.querySelector('#impJson').onchange = ev => { const file = ev.target.files[0]; if (!file) return; const rd = new FileReader(); rd.onload = () => { try { const { genome, issues } = validateGenome(JSON.parse(rd.result)); genome.meta.repairs = issues.map(i => ({ rule: 'schema_validate', path: '-', from: '-', to: i })); genome.meta.edited = true; finalize(genome); syncSelects(genome); setFish(genome); toast(`Imported (${issues.length} schema fixes, ${genome.meta.repairs.length} total repairs)`); } catch (e) { toast('Import failed: ' + e.message); } }; rd.readAsText(file); };
-  },

@@ -1,3 +1,19 @@
+      show(); if (TEST_STATE.cancel) break;
+    }
+    if (!TEST_STATE.cancel) {
+      const row = { name: 'All reference species', n: 0, m: 0, geo: 0, hero: 0, lod: 0, fail: 0 }; rows.push(row);
+      for (const sp of SPECIES) {
+        if (TEST_STATE.cancel) break;
+        const g = generate({ species: sp.id, seed: 'reference-anatomy' }); testGenome(g, row, true);
+        const a = anatomyProfile(g), locks = a.locks;
+        if (Object.keys(locks).some(p => getP(g, p) !== locks[p])) { row.fail++; issues.push(sp.n + ': lineage architecture failed'); }
+        const again = generate({ species: sp.id, seed: 'reference-anatomy' });
+        if (JSON.stringify(stripGenome(g)) !== JSON.stringify(stripGenome(again))) { row.fail++; issues.push(sp.n + ': generation is not deterministic'); }
+        const mutant = mutate(g, .7, 'breed-' + sp.id), offspring = breed(g, mutant, 'cross-' + sp.id); row.m++;
+        if (violations(offspring).length) { row.fail++; issues.push(sp.n + ': crossover rules failed'); }
+        prog.textContent = 'Reference anatomy: ' + sp.n; show(); await yieldFrame();
+      }
+    }
     const failed = rows.reduce((n, r) => n + r.fail, 0); TEST_STATE.last = { rows, issues, exhaustive, canceled: TEST_STATE.cancel };
     prog.textContent = TEST_STATE.cancel ? 'Canceled. Partial results shown.' : failed ? `${failed} checks failed. Details below.` : 'All completed checks passed.';
   } finally { TEST_STATE.running = App.testing = false; App.paused = beforePause; }
@@ -205,9 +221,3 @@ const PAL_PULL = { openOcean: .6, mesopelagic: .7, abyssal: .85, hadal: .7, sand
 function adaptHab(g, hab, rng) {
   const touched = {}, notes = [], tag = new Set(g.meta.tags || []), keep = p => { if (!(p in touched)) touched[p] = cp3(getP(g, p)); };
   const M = (p, f) => { keep(p); setN(g, p, getP(g, p) * f); }, Dd = (p, d) => { keep(p); setN(g, p, getP(g, p) + d); }, S = (p, v) => { keep(p); setP(g, p, cp3(v)); }, Lm = (p, l) => { keep(p); const c2 = getP(g, p).slice(); c2[2] = clamp(c2[2] * l, .02, .96); setP(g, p, c2); };
-  const R = roleOf(g), P = AX(g), role = R.top, plan = planOf(g), upright = plan === 'upright';
-  const H = { dark: clamp(1 - Math.pow(hab.light, .35), 0, 1), deep: hab.tags.includes('deep'), cold: hab.tags.includes('cold') || ['abyssal', 'hadal'].includes(hab.id), flow: { fastRiver: 1, mountainStream: 1, slowRiver: .3, rockyShore: .5, kelpForest: .25 }[hab.id] || 0,
-    cover: ['coralReef', 'kelpForest', 'mangrove', 'floodplain', 'blackwater', 'crystalCavern', 'deepReef', 'rockyShore', 'seagrass'].includes(hab.id), open: hab.floor === false, bottom: hab.tags.includes('benthic') || ['abyssal', 'hadal', 'sandFlat', 'cave', 'deepReef'].includes(hab.id), turbid: hab.fog > .1 && hab.light < .7 && !hab.fantasy };
-  notes.push(`Ecological role here: ${ROLE_TXT[role]}${R.second !== role ? ', with ' + ROLE_TXT[R.second] + ' tendencies' : ''}.`);
-  if (H.dark > .25) {
-    if (['bottom', 'grazer', 'ribbon', 'armor'].includes(role) || tag.has('cave')) { M('head.eyeSize', 1 - .55 * H.dark); S('skin.lateralLine', 1); if (!['beak', 'tube'].includes(g.mouth.type)) { Dd('head.barbels', Math.round(2 * H.dark)); S('head.barbelLen', Math.max(g.head.barbelLen, .6)); } if (H.dark > .9 && tag.has('cave')) S('head.eyeSide', 'none'); notes.push('Little light reaches the bottom: eyes shrink while a full lateral line and barbels take over sensing.'); }
