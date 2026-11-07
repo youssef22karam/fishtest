@@ -128,9 +128,10 @@ export function buildSkinBlend(THREE, spec, seg, sk) {
   const { center: c, R } = spec, F = eyeFrame(THREE, spec.axis, spec.forward, spec.up), { a, tu, tv } = F, TAU = Math.PI * 2;
   const Rin = R * 1.018, rIn = Rin * Math.sin(BLEND_IN), zIn = Rin * Math.cos(BLEND_IN), W = R * BLEND_W;
   const zs = (f, v) => sk.z0 + sk.gf * f + sk.gv * v - .5 * (sk.kf * f * f + sk.kv * v * v);
+  const q1 = (spec.u || 0) * 977.3, q2 = q1 * 1.7 + 2.1, q3 = q1 * 2.9 + 4.4, irr = ph => 1 + .2 * Math.sin(2 * ph + q1) + .13 * Math.sin(3 * ph + q2) + .08 * Math.sin(5 * ph + q3) + .05 * Math.sin(8 * ph + q1 * 3.1);
   let rimH = 0; const prox = [], rows = seg <= 8 ? 3 : 8, cols = seg <= 8 ? 14 : 36;
   const geo = makePart(THREE, rows, cols, true, (t, h) => {
-    const phi = h * TAU, cp = Math.cos(phi), sp = Math.sin(phi), s = t, S = s * s * (3 - 2 * s), r = rIn + W * s, f = r * cp, v = r * sp;
+    const phi = h * TAU, cp = Math.cos(phi), sp = Math.sin(phi), s = t, S = s * s * (3 - 2 * s), r = rIn + W * s * irr(phi), f = r * cp, v = r * sp;   /* round 3: irregular outer boundary — no perfect circle */
     const hin = Math.max(0, zIn - zs(rIn * cp, rIn * sp)); if (t === 0) rimH = Math.max(rimH, hin);
     const z = zs(f, v) + hin * (1 - S) * (1 - S) - BLEND_DIVE * R * S, zb = zs(f, v);   /* zb: the head-surface point beneath this vertex — its skin coordinates (pattern, countershading) are the cap's, so colour matches the skin around it */
     prox.push(c.x + a.x * zb + tu.x * f + tv.x * v, c.y + a.y * zb + tu.y * f + tv.y * v, c.z + a.z * zb + tu.z * f + tv.z * v);

@@ -2,6 +2,7 @@
    BODY PLAN (anatomy family / plan flags), FEEDING NICHE (functional flags), SWIM MODE, DEPTH/HABITAT (light).
    Nothing is keyed to a named animal. Pure JS: used by the engine rules, the geometry builders and the validator. */
 
+import * as TG from './tailgeo.js';
 const clamp = (x, a, b) => x < a ? a : x > b ? b : x;
 const lerp = (a, b, t) => a + (b - a) * t;
 
@@ -134,35 +135,31 @@ export const HOMO_BANDS = [
   { t: [-.01, .18], types: ['rounded', 'truncate', 'diphycercal', 'filamentous', 'fantail'] },
 ];
 export function tailLaw(ax) {
-  const T = SWIM_T[ax.swim] ?? .5;
+  const T = SWIM_T[ax.swim] ?? .5, orn = TG.isOrnamental(ax);
   const family = ax.plan.flat >= 1 ? 'whip' : ax.plan.cartilaginous ? 'heterocercal' : 'homocercal';
   const band = HOMO_BANDS.find(b => T >= b.t[0] && T < b.t[1]) || HOMO_BANDS[2];
   let types = band.types.slice();
-  if (ax.plan.elongated && !types.includes('diphycercal')) types.push('diphycercal', 'filamentous');
+  if (ax.plan.elongated && !types.includes('diphycercal')) types.push('diphycercal');
+  if (orn) types.push('filamentous', 'fantail');
+  else types = types.filter(t => t !== 'filamentous');                           /* trailing filaments: ornamental niche only */
+  /* bottom / ambush niches and manoeuvring swimmers: rounded fan or paddle outlines only (never forked) */
+  const paddle = T < .55 && has(ax, 'ambusher', 'flatBenthic', 'bottomDweller', 'sifter', 'scavenger', 'crevice');
+  if (paddle) { const k = types.filter(t => ['rounded', 'truncate', 'fantail', 'diphycercal'].includes(t)); if (k.length) types = k; }
   if (ax.plan.family === 'glider') types.push('hypocercal');
   const keel = family === 'heterocercal' || T >= .85;
   return {
-    family, T, types,
+    family, T, types, paddle, ornamental: orn, planBias: TG.planBias(ax.plan.family),
     aspect: [lerp(.7, 3.5, T), lerp(1.8, 8.5, T)],
     pedDepthMax: lerp(.72, .22, Math.pow(T, 1.5)),
     keel, keelBand: keel ? [.45, 1] : [0, 0],
-    deflect: family === 'heterocercal' ? [.2, .85] : [0, 0],          /* upward deflection of the rear axis (plan parameter) */
-    lobeRatio: family === 'heterocercal' ? [1.05, 4] : [.85, 1.18],   /* upper / lower lobe length */
+    lobeAsymRange: family === 'heterocercal' ? [.0833, 1] : [0, 0],                      /* genome lobeAsym d → lobe ratio 1 + 1.2 d ∈ [1.1, 2.2] */
+    lobeRatio: family === 'heterocercal' ? [1.1, TG.CAP.lobeMax] : [.85, 1.18],       /* upper / lower lobe length */
+    spineDeg: family === 'heterocercal' ? TG.CAP.spineDeg : [0, 0],                    /* internal vertebral deflection in the peduncle */
+    pitchMax: TG.CAP.pitchDeg, capH: orn ? TG.CAP.caudalHOrn : TG.CAP.caudalH, capA: TG.CAP.caudalA,
     caudalArea: (FIN_ENV[ax.swim] || FIN_ENV.carangiform).caudal,
   };
 }
-/** Continuous homocercal outline: trailing-edge chord fraction at normalised half-span a∈[0,1], swim axis T, notch depth. */
-export function homocercalOutline(a, T, notch) {
-  const round = .38 + .62 * Math.sqrt(Math.max(0, 1 - a * a));
-  const trunc = .9 - .08 * a + .25 * notch * a * a;
-  const fork = lerp(.55, .24, notch) + (1 - lerp(.55, .24, notch)) * Math.pow(a, 1.5);
-  const lun = .16 + .75 * Math.pow(a, 1.8);
-  if (T < .3) return lerp(round, trunc, T / .3);
-  if (T < .65) return lerp(trunc, fork, (T - .3) / .35);
-  return lerp(fork, lun, (T - .65) / .35);
-}
-/** Upper-lobe / lower-lobe length ratio produced by a rear-axis deflection d∈[0,1]. */
-export const lobeRatioOf = d => 1 + 2.6 * d * d + .4 * d;
+export const homocercalOutline = TG.homocercalOutline, lobeRatioOf = TG.lobeRatioOf;
 
 /* ───────────────────────── 5. FLATTENED PLAN ───────────────────────── */
 export function flatLaw(ax, g) {
@@ -203,11 +200,13 @@ export function repairLaws(g, ax, lm, log, H) {
   if (ax.plan.flat >= 1) { st('head.spiracles', true); st('head.gillSlits', 5); }
   /* fins: areas inside the swim-mode envelope, min ray counts, stiffness at the cruising end */
   const F = finLaw(ax), m = H.metrics(g).finAreaFractions, f = g.fins;
+  const maxDf = Math.max(1e-3, bp.maxD);
+  for (const k of ['dorsal', 'anal']) { const cap = (k === 'dorsal' ? TG.CAP.dorsalH : TG.CAP.analH) / maxDf; cl(`fins.${k}.height`, .03, Math.max(.03, cap)); if (k === 'dorsal' && f.dorsal.count >= 2) cl('fins.dorsal2.height', .03, Math.max(.03, cap)); if (k === 'dorsal' && f.dorsal.count >= 3) cl('fins.dorsal3.height', .03, Math.max(.03, cap)); }
   for (const k of ['dorsal', 'anal', 'pectoral', 'pelvic']) {
     const [lo, hi] = F.env[k]; if (!(m[k] > 0)) continue;
     const scaleTo = tgt => tgt / m[k];
     if (m[k] > hi + 1e-6) { const s = scaleTo(hi * .97); if (k === 'pectoral') cl('fins.pectoral.len', .05, Math.max(.05, f.pectoral.len * s)); else if (k === 'pelvic') cl('fins.pelvic.len', .03, Math.max(.03, f.pelvic.len * s)); else { cl(`fins.${k}.height`, .03, Math.max(.03, f[k].height * s)); if (k === 'dorsal' && f.dorsal.count >= 2) cl('fins.dorsal2.height', .03, Math.max(.03, f.dorsal2.height * s)); } }
-    else if (m[k] < lo - 1e-6 && f[k].present) { const s = scaleTo(lo * 1.03), cap = k === 'dorsal' ? (H.a && H.a.dorsalLimit || 1.15) : k === 'anal' ? .7 : k === 'pectoral' ? 1.9 : .6; const cur = k === 'pectoral' || k === 'pelvic' ? f[k].len : f[k].height; const want = Math.min(cap, cur * s); if (want > cur) cl(k === 'pectoral' || k === 'pelvic' ? `fins.${k}.len` : `fins.${k}.height`, want, Math.max(want, cap)); }
+    else if (m[k] < lo - 1e-6 && f[k].present) { const s = scaleTo(lo * 1.03), cap = k === 'dorsal' ? (H.a && H.a.dorsalLimit || 1.15) : k === 'anal' ? .7 : k === 'pectoral' ? 1.9 : .6; const cur = k === 'pectoral' || k === 'pelvic' ? f[k].len : f[k].height; const want = Math.min(cap, cur * s, k === 'dorsal' || k === 'anal' ? TG.CAP.dorsalH / maxDf : 9); if (want > cur) cl(k === 'pectoral' || k === 'pelvic' ? `fins.${k}.len` : `fins.${k}.height`, want, Math.max(want, cap)); }
   }
   if (f.dorsal.spines + f.dorsal.rays < RAY_MIN.dorsal) st('fins.dorsal.rays', RAY_MIN.dorsal - f.dorsal.spines);
   if (f.anal.spines + f.anal.rays < RAY_MIN.anal) st('fins.anal.rays', RAY_MIN.anal - f.anal.spines);
@@ -223,9 +222,10 @@ export function repairLaws(g, ax, lm, log, H) {
     cl('body.pedDepth', .03, .14); cl('body.pedWidth', .2, .6); cl('fins.dorsal.height', .03, .3); cl('fins.dorsal.u0', .72, .95);
     if (f.anal.present) st('fins.anal.present', false);
   } else if (c.present) {
-    if (Tl.family === 'heterocercal') { if (c.type !== 'heterocercal') st('fins.caudal.type', 'heterocercal'); cl('fins.caudal.lobeAsym', Tl.deflect[0], Tl.deflect[1]); }
-    else { if (!Tl.types.includes(c.type)) st('fins.caudal.type', Tl.types[0]); if (c.type === 'hypocercal') cl('fins.caudal.lobeAsym', -.7, -.15); else if (!['diphycercal', 'filamentous'].includes(c.type)) cl('fins.caudal.lobeAsym', -.12, .18); cl('fins.caudal.aspect', Tl.aspect[0], Tl.aspect[1]); }
+    if (Tl.family === 'heterocercal') { if (c.type !== 'heterocercal') st('fins.caudal.type', 'heterocercal'); const d = TG.lobeAsymFromUnit(TG.unitOf(g, 'lobe')); if (Math.abs(c.lobeAsym - d) > 1e-6) st('fins.caudal.lobeAsym', +d.toFixed(6)); }
+    else { if (!Tl.types.includes(c.type)) st('fins.caudal.type', Tl.types[0]); if (c.type === 'hypocercal') cl('fins.caudal.lobeAsym', -.28, -.1); else if (!['diphycercal', 'filamentous'].includes(c.type)) cl('fins.caudal.lobeAsym', -.12, .12); cl('fins.caudal.aspect', Tl.aspect[0], Tl.aspect[1]); }
     cl('body.pedDepth', .03, Tl.pedDepthMax);
+    { const capSpan = Tl.capH / Math.max(1e-3, bp.maxD); cl('fins.caudal.span', Math.min(.3, capSpan), capSpan); }   /* caudal height ≤ capH × L */
     const [klo, khi] = Tl.keelBand; cl('body.keel', klo, khi);
     const ca = H.metrics(g).finAreaFractions.caudal, [alo, ahi] = Tl.caudalArea;
     if (ca > ahi + 1e-6) cl('fins.caudal.len', .03, Math.max(.03, c.len * Math.sqrt(ahi * .97 / ca)));
@@ -266,9 +266,9 @@ export function assertLaws(g, ax, lm, metricsFn) {
   if (g.mouth.cavityDepth > CAVITY_MAX + 1e-6) fail('mouth_gills', 'mouth cavity deeper than 0.35 head length');
   if (M.teethClass === 'absent' ? g.mouth.teeth !== 'none' : !sameClass(g.mouth.teeth, M.teethClass)) fail('mouth_gills', `teeth '${g.mouth.teeth}' not of niche class '${M.teethClass}'`);
   if (lm.mouthCorner > h * g.head.gillStart + 1e-6) fail('mouth_gills', 'mouth corner crosses the gill opening');
-  const Fl = finLaw(ax), m = metricsFn(g).finAreaFractions;
+  const Fl = finLaw(ax), mx = metricsFn(g), m = mx.finAreaFractions;
   for (const k of ['dorsal', 'anal', 'pectoral', 'pelvic', 'caudal']) if (m[k] > Fl.env[k][1] + 1e-3) fail('fins', `${k} area ${m[k]} outside the ${ax.swim} envelope`);
-  for (const k of ['dorsal', 'anal', 'pectoral', 'caudal']) { if (f[k].present && m[k] < Fl.env[k][0] * .9 - 1e-3) fail('fins', `${k} area ${m[k]} below the ${ax.swim} envelope`); if (Fl.stiff && f[k].present && f[k].flex > Fl.env.flexMax + 1e-6) fail('fins', `${k} not stiff enough for ${ax.swim}`); }
+  for (const k of ['dorsal', 'anal', 'pectoral', 'caudal']) { if (f[k].present && m[k] < Fl.env[k][0] * .9 - 1e-3 && !((k === 'dorsal' || k === 'anal') && f[k].height * mx.maxD >= TG.CAP.dorsalH - 2e-3)) fail('fins', `${k} area ${m[k]} below the ${ax.swim} envelope`); if (Fl.stiff && f[k].present && f[k].flex > Fl.env.flexMax + 1e-6) fail('fins', `${k} not stiff enough for ${ax.swim}`); }
   if (f.dorsal.present && f.dorsal.spines + f.dorsal.rays < RAY_MIN.dorsal) fail('fins', 'dorsal ray count below minimum');
   if (f.anal.present && f.anal.spines + f.anal.rays < RAY_MIN.anal) fail('fins', 'anal ray count below minimum');
   if (f.pectoral.present && f.pectoral.rays < RAY_MIN.pectoral) fail('fins', 'pectoral ray count below minimum');
