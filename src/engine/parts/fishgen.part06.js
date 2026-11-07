@@ -132,6 +132,7 @@ function bodyProfile(g) {
 const headDepth = (g, bp) => (bp || bodyProfile(g)).depth(g.head.lengthFrac * 0.75);
 /** Landmarks along normalized axis u (0 snout tip → 1 peduncle end). */
 function landmarks(g) {
+  fitHead(g);   /* round 6H: L1 eye re-fit (see fishgen.part11) */
   const h = g.head.lengthFrac, f = g.fins, b = g.body, op = h, ped = b.pedU;
   let mcU = h * (0.12 + 0.6 * g.mouth.gape);
   if (g.head.special === 'hammer') mcU = Math.max(mcU, g.head.specialLen * 1.15);

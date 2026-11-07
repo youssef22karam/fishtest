@@ -16,6 +16,8 @@ import * as PEC from './finmotion.js';
 import * as TAIL from './tailgeo.js';
 import { skinLaw } from './skinlaw.js';
 import { auditAnatomy } from './anatomycheck.js';
+import * as ROSTRUM from './rostrum.js';
+import * as COH from './coherence.js';
 
 /* ╔══════════════════════════════════════════════════════════════════╗
    ║ 0. NAMESPACE, UTILS, SEEDED PRNG                                 ║

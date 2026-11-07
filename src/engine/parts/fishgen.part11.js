@@ -45,3 +45,35 @@
   const info = { tris: Math.round(tris), quality: opts.quality || 'hero', anatomy: bm.a.label, caudalAR: caudal ? +caudal.ar.toFixed(2) : 0, caudalSpan: caudal ? caudal.span : 0, finAreas: fb.areas, rays: fb.rays, finBases: fb.bases, attachments: fb.attachments, landmarks3D: landmarks3D(bm), bounds: box, spine: bm.spine, pec: bm.pecInfo ? Object.assign({ restAbd: bm.law.pec.restAbd }, bm.pecInfo[1], { mirrored: bm.pecInfo.mirrored }) : null, tail: caudal, finH: bm.finH || {}, laws: { eye: bm.law.eye, mouth: bm.law.mouth, tail: { family: bm.law.tail.family, T: bm.law.tail.T, keel: bm.law.tail.keel }, flat: bm.law.flat } };
   return { group, uniforms: uni, materials: mats, bm, info, parts, geos, dispose() { geos.forEach(x => x.dispose()); for (const k in mats) { const m = mats[k]; if (m && m.dispose) m.dispose(); } (mats._eyes || []).forEach(m => m.dispose()); } };
 }
+
+/* ───────── ROUND 6H: coherence laws on every generation path ─────────
+   fitHead (L1/D1/D4): RE-FIT the eye to the chassis head law. The eye must sit inside the head span, with its whole sphere forward of the gill region's front edge. Donor coordinates
+   that violate this are never shipped: the gill series is pushed back first (up to its law maximum), and only then is the eye moved forward. Idempotent; called from landmarks(),
+   so the BodyModel, the gate, repair() and every cross / mutation / breed path see the same fitted head. */
+function fitHead(g) {
+  const hd = g.head; if (!hd || hd.eyeSide === 'none' || !(hd.lengthFrac > 0)) return g;
+  const h = hd.lengthFrac, er = hd.eyeSize * h * .69, gsMax = .8, margin = .004;
+  const need = (hd.eyeU * h + .5 * er + (hd.eyeSide === 'both' ? 0 : 2.3 * er) + margin) / h;   /* one-sided plans carry the second eye 2.3 R behind the first */                     /* gill-start fraction that clears the eye's rear edge */
+  if (need > hd.gillStart) { if (need <= gsMax) hd.gillStart = need; else { hd.gillStart = gsMax; hd.eyeU = (gsMax * h - .5 * er - (hd.eyeSide === 'both' ? 0 : 2.3 * er) - margin) / h; } }
+  const lo = (er + .004) / h; if (hd.eyeU < lo) hd.eyeU = lo;           /* never ahead of the snout */
+  return g;
+}
+/** analytic part of the shared audit (BodyModel only, no mesh): L1 span, L3 termination cap */
+function coherenceGenomeAudit(g) {
+  const out = [], bm = new BodyModel(g), lm = bm.lm, er = g.head.eyeSize * bm.h * .69;
+  if (g.head.eyeSide !== 'none') {
+    if (lm.eye + .5 * er > lm.gillStart + 1e-4) out.push({ code: 'EYE_OUTSIDE_HEAD', msg: 'eye on the gill region' });
+    if (lm.eye - er < -.004 || lm.eye + .5 * er > lm.operculum + 1e-4) out.push({ code: 'EYE_OUTSIDE_HEAD', msg: 'eye outside the head span' });
+  }
+  if (!bm.disc && !(bm.capU > 0)) out.push({ code: 'FLAT_BODY_END', msg: 'no rounded rear termination' });
+  return out;
+}
+/** THE shared audit: analytic always; opts.mesh builds the fish (gallery quality) and runs laws L1-L6 on the real geometry. Returns [{code,msg}]. */
+function coherenceAudit(g, opts = {}) {
+  let out = coherenceGenomeAudit(g);
+  if (opts.mesh) { const fish = buildFish(deepClone(g), { quality: 'med' }); try { out = out.concat(COH.auditCoherence(fish, THREE)); } finally { fish.dispose(); } }
+  return out;
+}
+/** production acceptance test shared by Wonder, Breed, Mix, niche shift, evolve */
+const acceptable = c => !violations(c).length && !structuralAudit(c).length;
+FG.coherenceAudit = coherenceAudit; FG.fitHead = fitHead; FG.acceptable = acceptable; FG.COH = COH;

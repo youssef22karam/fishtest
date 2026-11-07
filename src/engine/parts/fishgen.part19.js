@@ -147,7 +147,7 @@ function doMix() {
     const habId = $('selHabitat').value, seed = Math.floor(Math.random() * 1e9).toString(36), ratio = +$('mixRatio').value / 100;
     const A = deepClone(App.genome), B = parentFrom(val, habId, 'b' + seed), pre = hybridize(A, B, ratio, seed);
     if (val.startsWith('ni:') && ratio >= .5) pre.meta.niche = val.slice(3);
-    const c = adaptFinish(pre, habId, seed); c.meta.evo = { step: 0, base: c.meta.name, nov: {}, don: null, hab: null, last: null, log: [] }; setFish(c);
+    const c = adaptFinish(pre, habId, seed); if (!acceptable(c)) throw new Error('That cross is not anatomically coherent. Try another ratio or partner.'); c.meta.evo = { step: 0, base: c.meta.name, nov: {}, don: null, hab: null, last: null, log: [] }; setFish(c);
     toast(`${c.meta.name}: ${(c.meta.hybrid.syn[0] || { t: 'organ-by-organ blend' }).t} Open Hybrid Lab for the full report.`);
   } catch (e) { console.error(e); toast(e.message || 'Mix failed'); }
 }
