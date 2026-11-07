@@ -145,7 +145,6 @@ function blobMesh(bm, mats, H, centre, ax, ay, az, fr, tag, wFn, rows = 8, cols 
   geo.setAttribute('aBody', new THREE.Float32BufferAttribute(ab, 4)); geo.computeVertexNormals();
   const mesh = new THREE.Mesh(geo, mats.jaw); mesh.frustumCulled = false; mesh.renderOrder = 1; return mesh;
 }
-
 /** Layered interior (visible only when the jaw opens): inner walls (the capped pocket), tongue as a floor mass, and the first gill arches hinted in shadow at the back. */
 export function buildInterior(bm, mats, H) {
   const { THREE } = H, g = bm.g, walls = buildCavity(bm, mats, H), out = [...walls]; walls.forEach(w => { w.userData.layer = "walls"; });
