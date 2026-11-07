@@ -178,7 +178,7 @@ function buildEyes(bm, seg, mats) {
   if (opaque.length) { const m = new THREE.Mesh(EYE.mergeParts(THREE, opaque), mats.eyeOrgan(false, eyeCol, specs[0].axis)); m.frustumCulled = false; m.userData.eyeball = true; m.userData.eyes = infos; out.push(m); }
   if (glass.length) { const m = new THREE.Mesh(EYE.mergeParts(THREE, glass), mats.eyeOrgan(true, eyeCol, specs[0].axis)); m.frustumCulled = false; m.renderOrder = 3; m.userData.eyeGlass = true; out.push(m); }
   if (skin.length) { const geo = mergeGeos(skin); skinAttributes(geo, bm); const m = new THREE.Mesh(geo, mats.body); m.frustumCulled = false; m.userData.eyeball = true; m.userData.eyes = infos; out.push(m); }
-  if (blends.length) { const geo = mergeGeos(blends), pg = new THREE.BufferGeometry(); pg.setAttribute('position', new THREE.Float32BufferAttribute(blends.flatMap(b => b.userData.prox), 3)); skinAttributes(pg, bm); geo.setAttribute('aBody', pg.getAttribute('aBody')); pg.dispose(); const m = new THREE.Mesh(geo, mats.body); m.frustumCulled = false; m.userData.eyeSkin = true; out.push(m); }
+  if (blends.length) { const geo = mergeGeos(blends), ab = new Float32Array(blends.reduce((n, b) => n + b.userData.prox.length / 3, 0) * 4); let o = 0; for (const b of blends) { const a = patchBodyCoords(bm, b.userData.prox, b.userData.side); ab.set(a, o); o += a.length; } geo.setAttribute('aBody', new THREE.BufferAttribute(ab, 4)); const m = new THREE.Mesh(geo, mats.body); m.frustumCulled = false; m.userData.eyeSkin = true; out.push(m); }
   return out;
 }
 function buildNostrils(bm, mats) {

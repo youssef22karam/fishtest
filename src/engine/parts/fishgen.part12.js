@@ -11,7 +11,7 @@
   }
 
   /* skin relief that is not scales: pebbling, lips, orbit, opercle, nares */
-  if(uDetail>.4 && (tissue<2.0 || skinT)){
+  if(uDetail>.4 && (tissue<1.95 || skinT)){
     float mh=microH(u,vert,head*capK);
     vec3 mgrad=sign(det)*(dFdx(mh)*r1+dFdy(mh)*r2)*relief;
     N=normalize(max(abs(det),1e-12)*N-mgrad);
@@ -33,7 +33,7 @@
   float pore=line*(1.0-smoothstep(.12,.34,abs(fract(u*uFineness*26.0/uScaleSize)-.5)))*visible;
   col*=1.0-.18*line-.35*pore;
 
-  if(tissue>.5 && tissue<2.0) col=mix(vec3(.34,.12,.12),vec3(.08,.02,.03),smoothstep(-.2,.9,vert*.5+.5))*(.85+.15*sin(u*70.0));
+  if(tissue>.5 && tissue<1.95) col=mix(vec3(.34,.12,.12),vec3(.08,.02,.03),smoothstep(-.2,.9,vert*.5+.5))*(.85+.15*sin(u*70.0));
   if(tissue>5.4 && tissue<6.6){ float dk=clamp((tissue-6.0)*4.0,0.0,1.0), dep=(.42+.40*dk)*(.55+.45*vBody.w);   /* slit throat: shaded depth, darkest at the deep rear wall and mid-length */
     col=mix(col,mix(vec3(.17,.05,.06),vec3(.012,.007,.009),smoothstep(.2,.9,dk)),dep); }
   if(tissue>3.45 && tissue<3.7){ col=mix(col,mix(col,vec3(.72,.58,.55),.35),.6); col*=.90+.10*sin(ang*520.0+(u-uPreU)*26.0); }   /* branchiostegal membrane: fine ray fan */
@@ -51,7 +51,7 @@
   float metal=clamp(uSilver*guan*1.15,0.0,.85)*(1.0-head*.55);
   float coat=mix(.45,1.0,uWet)*(1.0-.25*head)*(1.0-.55*uMatte+.12*uSheen);
   float sss=uTrans*.9+.12;
-  bool inner=tissue>.5 && tissue<2.0;
+  bool inner=tissue>.5 && tissue<1.95;
   if(inner){ rough=.78; metal=0.0; coat=.2; sss=.3; }
   vec3 sheen=mix(uBase,vec3(.8,.88,1.0),.6)*uIrid*(.25+.75*guan);
   vec3 c=pbrSkin(col,N,vWP,rough,metal,sss,coat,sheen);
@@ -68,7 +68,7 @@
     c+=uGlow*dotp*step(uHeadU,u)*step(u,.99)*( .85+.15*sin(uTime*2.5+floor(pu)))*1.7;
   }
   if(uElectric>.5) c+=vec3(.2,.35,.65)*uElectric*pow(max(0.0,sin(uTime*5.0+u*16.0)),24.0)*smoothstep(.3,.8,u)*.14;
-  if(tissue>.5 && tissue<2.0){   /* round 4: interior tone = depth gradient (vBody.y = baked occlusion: throat 1, lips ~.2), palette/band derived, mostly unlit so no lit strip can read as a divider */
+  if(tissue>.5 && tissue<1.95){   /* round 4: interior tone = depth gradient (vBody.y = baked occlusion: throat 1, lips ~.2), palette/band derived, mostly unlit so no lit strip can read as a divider */
     float occ=clamp(vBody.y,0.0,1.0); vec3 tn=mix(uIntLip,uIntThroat,smoothstep(.0,.9,occ));
     if(tissue>1.4 && tissue<1.6) tn=mix(uIntLip*1.3,uIntThroat,smoothstep(.2,1.0,occ)*.7); else if(tissue>1.2 && tissue<1.3) tn*=.7;
     tn*=.9+.2*fbm(vec2(u*40.0,occ*20.0)+uSeed); c=tn+c*.10*(1.0-.5*occ); }
