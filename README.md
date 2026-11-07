@@ -8,29 +8,29 @@ single file being cut off.
 ## Why it looks split
 
 The fish engine is one large ES module. In the original project it was a
-single file, `src/engine/fishgen.js` (530,659 bytes). Here it lives as 19
+single file, `src/engine/fishgen.js` (535,192 bytes). Here it lives as 19
 sequential parts:
 
 ```
-src/engine/parts/fishgen.part01.js   (lines 1–227 of the module)
-src/engine/parts/fishgen.part02.js   (lines 228–272 of the module)
-src/engine/parts/fishgen.part03.js   (lines 273–320 of the module)
-src/engine/parts/fishgen.part04.js   (lines 321–496 of the module)
-src/engine/parts/fishgen.part05.js   (lines 497–716 of the module)
-src/engine/parts/fishgen.part06.js   (lines 717–931 of the module)
-src/engine/parts/fishgen.part07.js   (lines 932–1221 of the module)
-src/engine/parts/fishgen.part08.js   (lines 1222–1481 of the module)
-src/engine/parts/fishgen.part09.js   (lines 1482–1761 of the module)
-src/engine/parts/fishgen.part10.js   (lines 1762–2023 of the module)
-src/engine/parts/fishgen.part11.js   (lines 2024–2070 of the module)
-src/engine/parts/fishgen.part12.js   (lines 2071–2395 of the module)
-src/engine/parts/fishgen.part13.js   (lines 2396–2701 of the module)
-src/engine/parts/fishgen.part14.js   (lines 2702–2894 of the module)
-src/engine/parts/fishgen.part15.js   (lines 2895–3074 of the module)
-src/engine/parts/fishgen.part16.js   (lines 3075–3324 of the module)
-src/engine/parts/fishgen.part17.js   (lines 3325–3547 of the module)
-src/engine/parts/fishgen.part18.js   (lines 3548–3694 of the module)
-src/engine/parts/fishgen.part19.js   (lines 3695–3929 of the module)
+src/engine/parts/fishgen.part01.js   (lines 1–229 of the module)
+src/engine/parts/fishgen.part02.js   (lines 230–274 of the module)
+src/engine/parts/fishgen.part03.js   (lines 275–322 of the module)
+src/engine/parts/fishgen.part04.js   (lines 323–498 of the module)
+src/engine/parts/fishgen.part05.js   (lines 499–718 of the module)
+src/engine/parts/fishgen.part06.js   (lines 719–934 of the module)
+src/engine/parts/fishgen.part07.js   (lines 935–1224 of the module)
+src/engine/parts/fishgen.part08.js   (lines 1225–1484 of the module)
+src/engine/parts/fishgen.part09.js   (lines 1485–1771 of the module)
+src/engine/parts/fishgen.part10.js   (lines 1772–2034 of the module)
+src/engine/parts/fishgen.part11.js   (lines 2035–2113 of the module)
+src/engine/parts/fishgen.part12.js   (lines 2114–2438 of the module)
+src/engine/parts/fishgen.part13.js   (lines 2439–2744 of the module)
+src/engine/parts/fishgen.part14.js   (lines 2745–2937 of the module)
+src/engine/parts/fishgen.part15.js   (lines 2938–3117 of the module)
+src/engine/parts/fishgen.part16.js   (lines 3118–3367 of the module)
+src/engine/parts/fishgen.part17.js   (lines 3368–3591 of the module)
+src/engine/parts/fishgen.part18.js   (lines 3592–3738 of the module)
+src/engine/parts/fishgen.part19.js   (lines 3739–3973 of the module)
 ```
 
 The parts are **one continuous module in filename order** — the `import`
