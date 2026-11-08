@@ -87,31 +87,6 @@ installProcUI({ FG, App, THREE, ENV, PANELS, setFish, buildFish, openSheet, toas
 FG.centreAudit = (bm, pose) => MCHK.centrePlaneAudit(bm, { THREE, H: GH, MOUTH, buildJawGeometry, buildTeeth, LAW }, pose == null ? 1 : pose);
 FG.round2Check = bm => MCHK.round2Check(bm, { THREE, H: GH, MOUTH, buildJawGeometry, buildTeeth, LAW });
 Object.assign(FG, { App, setFish, buildEnvironment, runSelfTest, HABITATS, NICHES, CLADES, SPECIES, FORM_RULES, SCHEMA, ENV });
-/* (moved from part10 to keep every part under 30,000 bytes: function declarations are hoisted) */
-function addPelvic(fb, bm, side, K, rays) {
-  const f = bm.g.fins.pelvic, u = bm.lm.pelvicBase, p = {}, fr = {}, fused = f.shape === 'fused', len = f.len * bm.maxD * .55, spread = fused ? .16 : .48, sec = {};
-  bm.frame(u, fr); bm.section(u, sec);
-  /* round 3: pelvic fins stay small — never longer than the side fins of the same fish (gliding plan excepted), ≤ .20 L, base buried like the others */
-  const pecL = bm.pecInfo && bm.pecInfo[1] && bm.pecInfo[1].lenOverL ? bm.pecInfo[1].lenOverL * bm.L : 0, glide = bm.a.family === 'glider' || bm.a.family === 'ray', sink = Math.min(TAIL.CAP.sink * bm.L, .5 * sec.dDn);
-  const lenCap = Math.min(TAIL.CAP.pelvicH * bm.L / .8, glide || !pecL ? 9 : pecL * .8); const lenF = Math.min(len, lenCap); (bm.finH || (bm.finH = {})).pelvic = lenF * 1.2 / bm.L; bm.finH.pecL = pecL / bm.L;
-  const rootU = t => clamp(u + t * bm.bp.maxD * .12, .02, .94), rootTh = -Math.PI / 2 + side * spread;
-  return fb.add({ bm, kind: 'pelvic', kindId: 4, sink, R: Math.max(rays, K > 2 ? 10 : 4), K, flex: f.flex, opacity: f.opacity, memb: f.shape === 'filament' ? .32 : 1, spineFrac: 0, solid: bm.a.solid, blend: .65, thickness: bm.maxD * bm.a.root * .22, normal: new THREE.Vector3(0, 0, side),
-    base: (t, out) => { bm.surface(rootU(t), rootTh, p); out.set(p.x, p.y, p.z); },
-    root: (t, skinSide, out) => { const uu = rootU(t), theta = rootTh + skinSide * .045 * Math.sin(Math.PI * t); bm.surface(uu, theta, p); out.set(p.x, p.y, p.z); out.u = uu; out.theta = theta; },
-    edge: (t, out) => {
-      const v = foilOutline(t, .4, .55, .5), h = f.shape === 'filament' ? Math.pow(Math.max(0, Math.sin(Math.PI * t)), 5) : v[1];
-      bm.surface(rootU(t), rootTh, p); out.set(p.x + fr.tx * lenF * .8 * h, p.y - lenF * (bm.a.solid ? .3 : .68) * h, p.z + side * lenF * .6 * h);
-    } });
-}
-function onResize() { if (!renderer) return; const width = innerWidth - (typeof currentTab !== 'undefined' && currentTab && innerWidth >= 1000 ? 420 : 0); renderer.setSize(width, innerHeight, false); $('gl').style.width = width + 'px'; camera.aspect = width / innerHeight; camera.updateProjectionMatrix(); }
-function applyTier() {
-  const t = TIERS[App.tier]; if (renderer) renderer.setPixelRatio(Math.min(devicePixelRatio || 1, t.pr));
-  if (App.env) { if (App.env.shafts) App.env.shafts.visible = t.shafts && App.mode === 'habitat'; if (App.env.particles) { App.env.particles.visible = t.particles > 0 && App.mode === 'habitat'; App.env.particles.geometry.setDrawRange(0, t.particles); } }
-  if (App.school) App.school.setCount(t.school);
-  const target = App.tier >= 2 ? 'med' : 'hero';
-  if (App.fish && App.fish.info.quality !== target && !App.qualityPending) { App.qualityPending = true; setTimeout(() => { App.qualityPending = false; if (App.genome && !App.contextLost) setFish(App.genome, { noHistory: true, keepCamera: true, skipPanel: true }); }, 0); }
-}
-function adaptQuality(dt, fps) { App.fpsEma = lerp(App.fpsEma, fps, 0.08); if (App.fpsEma < 42) { App.lowT += dt; App.highT = 0; if (App.lowT > 2 && App.tier < TIERS.length - 1) { App.tier++; App.lowT = 0; applyTier(); toast('Lowered detail (tier ' + App.tier + ') to keep 60 fps'); } } else if (App.fpsEma > 57) { App.highT += dt; App.lowT = 0; if (App.highT > 10 && App.tier > (isMobile ? 1 : 0)) { App.tier--; App.highT = 0; applyTier(); } } else { App.lowT = Math.max(0, App.lowT - dt); } }
 export { boot, FG };
 export default boot;
 /* round 4.2: the eye blend patch samples the SAME skin-coordinate field as the loft. The loft's angular coordinate is the section's PARAMETRIC angle theta (ang = (theta + pi/2) / tau), which is not the

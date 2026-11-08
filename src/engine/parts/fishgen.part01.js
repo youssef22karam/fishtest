@@ -10,7 +10,6 @@ import * as GILL from './gillgeo.js';
 import * as DISC from './discgeo.js';
 import { OP } from './headlaw.js';
 import * as TEETHGEO from './teethgeo.js';
-import * as FINROOT from './finroot.js';
 import * as MCHK from './mouthcheck.js';
 import * as APP from './appendages.js';
 import * as EYE from './eyegeo.js';
