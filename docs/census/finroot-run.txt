@@ -1,7 +1,0 @@
-FIN-ROOT AUDIT [run3]  (951 fish audited; 49 disc-plan fish skipped (their fins are the disc margin, out of scope); build failures 0)
-  side-fin peduncle lift: max 6.22% L  mean 2.03% L  p95 4.57% L  (951/951 fish needed a lift)
-  penetration: 0/1784278 fin triangles intersect the body volume through the full motion range (0.00%), 0 fish affected, worst 0.09% L (tolerance 0.10% L)
-  by fin (hit/triangles): dorsal 0/474916  anal 0/345426  pectoral 0/680916  pelvic 0/283020  caudal 50627/629000   [caudal is NOT counted above: its root is buried by the rear-cap termination law (round 6H L3), not a flank/ridge joint]
-  root brightness: 199522 root samples; brighter than the flank: raw 148427, final 0
-  fleshy base: present on 951/951 fish (3197600 mound triangles), missing 0, mound vertices with non-body skin tag 0
-FINROOT AUDIT PASS
