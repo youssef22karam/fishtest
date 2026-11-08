@@ -7,12 +7,10 @@
    "EYE_SLICED": 0,
    "DETACHED_TEETH": 0,
    "FLAT_BODY_END": 0,
-   "MOUTH_CORNER_OPEN": 1
+   "MOUTH_CORNER_OPEN": 0
   },
-  "fishWith": 1,
-  "examples": [
-   "V66HKTNW carpetShark MOUTH_CORNER_OPEN: cheek wall has 2 free edges inside the head at the mouth corner (up to 0.11 head lengths deep)"
-  ]
+  "fishWith": 0,
+  "examples": []
  },
  "wonRaw": {
   "n": 300,
