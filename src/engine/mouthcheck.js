@@ -7,7 +7,7 @@ import { jawU0, jawU1, jawSpreadRef, spreadZ } from './mouthgeo.js';
 import { jawEnv, jawIn, TEETH_SLACK } from './teethgeo.js';
 export function round2Check(bm, ctx, rays = false) {
   const { THREE, H, MOUTH, buildJawGeometry, buildTeeth, LAW } = ctx, errs = [], M = bm.law.mouth, hl = bm.h * bm.L;
-  if (LAW.EYE_PROTRUSION > LAW.EYE_PROTRUSION_MAX) errs.push('eye protrudes more than 1/6 of its diameter');
+  if (LAW.EYE_PROTRUSION < LAW.EYE_PROTRUSION_MIN || LAW.EYE_PROTRUSION > LAW.EYE_PROTRUSION_MAX) errs.push('eye protrudes more than 1/3 of its diameter');
   if (M.construction !== 'jawed' || bm.oralDisc || bm.ventralMouth) return errs;
   const jaw = buildJawGeometry(bm), pocket = MOUTH.buildCavity(bm, { jaw: null }, H)[0].geometry, ang = M.openRad, piv = jaw.pivot;
   const pose = geo => { const P = geo.getAttribute('position'), A = geo.getAttribute('aBody'), out = []; for (let i = 0; i < P.count; i++) { const w = A.getW(i), a = -ang * w, c = Math.cos(a), s = Math.sin(a), dx = P.getX(i) - piv.x, dy = P.getY(i) - piv.y; out.push(piv.x + c * dx - s * dy, piv.y + s * dx + c * dy, spreadZ(P.getZ(i), A.getX(i), w, jawU0(bm), jawU1(bm), jawSpreadRef(bm, H), 1)); } const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(out, 3)); g.setIndex(geo.getIndex()); return g; };

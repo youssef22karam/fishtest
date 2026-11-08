@@ -30,3 +30,27 @@ export function eyeBand(h, eyeSize, eyeSide = 'both') {
   const lo = (er + .004) / h;
   return { lo: Math.min(lo, seat), hi, seat };
 }
+
+/* EYE-SEAT BAND (round 6H.3a) — the ONE definition of how deep an eyeball sits in its local socket/dome surface.
+   Shared by eye construction (eyegeo.js / buildEyes) and BOTH audits (classic mesh audit + shared coherence audit):
+     resting default : centre EYE_SEAT (.70) radii below the local surface → cornea domes gently proud (protrusion = .15 diameter);
+     lower bound     : cornea protrusion ≥ EYE_PROTRUSION_MIN (~.105 diameter, centre ≤ cos(CORNEA_REACH) R deep) + CORNEA_CLEAR (.012 R)
+                       clearance above the local surface so the corneal cap is 100% visible (never buried);
+     upper bound     : cornea protrusion ≤ EYE_PROTRUSION_MAX (1/3 of eye diameter, centre ≥ 1/3 R inside the socket — never bulging). */
+export const LIMBUS = .62;                        /* polar angle (rad) of the corneal rim measured from the optical axis */
+export const CORNEA_REACH = LIMBUS + .04;         /* corneal cap reach tested against the local head/dome surface */
+export const CORNEA_CLEAR = .012;                 /* clearance (× R) keeping the corneal dome proud of the local surface */
+export const BURIAL_MAX = .02;                    /* audit tolerance (× R) on cornea burial depth */
+export const CORNEA_VIS_MIN = .97;                /* minimum ray-cast cornea visibility fraction (side / front-quarter) */
+export const EYE_SEAT = .70;                      /* resting seat depth (× R) below the local surface */
+export const EYE_SEAT_MAX = Math.cos(CORNEA_REACH); /* deepest seat (× R) that keeps the corneal rim above the surface */
+export const EYE_SEAT_MIN = 1 / 3;                /* shallowest seat (× R) allowed by the 1/3-diameter protrusion cap */
+export const EYE_PROTRUSION = (1 - EYE_SEAT) / 2;         /* resting cornea protrusion ÷ diameter (.15) */
+export const EYE_PROTRUSION_MIN = (1 - EYE_SEAT_MAX) / 2; /* lower bound of seat band: cornea clears the surface (~.105) */
+export const EYE_PROTRUSION_MAX = (1 - EYE_SEAT_MIN) / 2; /* upper bound of seat band: ≤ 1/3 of eye diameter */
+export const SEAT_BAND = {
+  seat: EYE_SEAT, seatMin: EYE_SEAT_MIN, seatMax: EYE_SEAT_MAX,
+  min: EYE_PROTRUSION_MIN, nom: EYE_PROTRUSION, max: EYE_PROTRUSION_MAX,
+  limbus: LIMBUS, reach: CORNEA_REACH, clear: CORNEA_CLEAR, burialMax: BURIAL_MAX, visMin: CORNEA_VIS_MIN,
+};
+export function seatBand() { return SEAT_BAND; }

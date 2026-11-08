@@ -4,8 +4,8 @@
 
 import * as TG from './tailgeo.js';
 import { APPENDAGE_CAP, barbelLaw, barbelPlan, barbelLength, repairHead, assertHead, VENTRAL, ventralMouth } from './headlaw.js';
-import { eyeBand } from './eyeband.js';
-export { APPENDAGE_CAP, barbelLaw, barbelPlan, barbelLength };
+import { eyeBand, EYE_SEAT, EYE_PROTRUSION, EYE_PROTRUSION_MIN, EYE_PROTRUSION_MAX } from './eyeband.js';
+export { APPENDAGE_CAP, barbelLaw, barbelPlan, barbelLength, EYE_SEAT, EYE_PROTRUSION, EYE_PROTRUSION_MIN, EYE_PROTRUSION_MAX };
 const clamp = (x, a, b) => x < a ? a : x > b ? b : x;
 const lerp = (a, b, t) => a + (b - a) * t;
 
@@ -39,7 +39,6 @@ const has = (ax, ...f) => f.some(x => ax.flags.has(x));
 /* ───────────────────────── 2. EYES ───────────────────────── */
 /* the eyeball sphere's radius is EYE_GEO × (genome eye size × head length / 2): bands are stated on the genome unit and as the true measured diameter / head length */
 export const EYE_GEO = .69 / .5;
-export const EYE_PROTRUSION_MAX = 1 / 6 + 1e-6;   /* round 2: ≤ 1/6 of the eye diameter (flush, mostly embedded) */   /* exposed dome height / diameter */
 export function eyeLaw(ax) {
   let band, regime;
   if (ax.lightless) { band = [.058, .06]; regime = 'vestigial'; }
@@ -60,9 +59,7 @@ export function eyeLaw(ax) {
   const forwardMin = has(ax, 'ambusher', 'lurer') ? .3 : 0;
   return { band, ratioBand: band.map(v => v * EYE_GEO), regime, vestigial: regime === 'vestigial', pupil, pupilId: pupil === 'vertical' ? 1 : pupil === 'horizontal' ? 2 : 0, placement, count: 2, covers: { adipose, nictitating }, irisSet, bottomOriented, forwardMin };
 }
-/* the eyeball is a sphere seated in an orbit: its centre lies EYE_SEAT radii below the skin, so the dome protrudes (1 - EYE_SEAT) / 2 diameters */
-export const EYE_SEAT = .70;
-export const EYE_PROTRUSION = (1 - EYE_SEAT) / 2;
+/* EYE_SEAT, EYE_PROTRUSION, EYE_PROTRUSION_MIN, EYE_PROTRUSION_MAX imported + re-exported from eyeband.js (single source of truth) */
 /** effective dorsal eye station (fraction of local half-depth): lateral default, shifted dorsal for bottom-oriented plans */
 export function eyeStation(g, E, ax) {
   if (ax.plan.flat > 0 || ax.plan.sideFlat || ax.plan.headExpanded) return g.head.eyeV;

@@ -3,7 +3,8 @@
    examined with the engine's analytic BodyModel — NO mesh is built before both stages pass. */
 import { AX_KEYS, DISC_KEYS, PALETTES, envelope, CLADES, SIZE_BANDS } from './clades.js';
 import { traitsToParams } from './mapping.js';
-import { assertLaws, EYE_GEO, finLaw, EYE_PROTRUSION_MAX, EYE_PROTRUSION, EYE_SEAT, CAVITY_MAX } from './laws.js';
+import { assertLaws, EYE_GEO, finLaw, CAVITY_MAX } from './laws.js';
+import { EYE_PROTRUSION_MIN, EYE_PROTRUSION_MAX, EYE_PROTRUSION, EYE_SEAT } from './eyeband.js';
 
 export const INVARIANTS = ['symmetry', 'eyes', 'appendages', 'fins', 'mouth_gills', 'profile', 'colour', 'envelope', 'tail', 'plan'];
 export const EYE_BAND = [.03, .15];                 /* eye diameter / head length */
@@ -86,7 +87,7 @@ export function checkEngine(t, g, FG) {
   const ax = FG.axesOf(g), whip = ax.plan.flat >= 1, FL = finLaw(ax);
   for (const x of assertLaws(g, ax, lm, FG.metrics)) F.push(x);
   const protrusion = EYE_PROTRUSION;                                          /* exposed dome / diameter from the eye construction */
-  if (protrusion > EYE_PROTRUSION_MAX) fail('eyes', 'eye protrudes more than a third of its diameter');
+  if (protrusion < EYE_PROTRUSION_MIN || protrusion > EYE_PROTRUSION_MAX) fail('eyes', 'eye protrudes more than a third of its diameter');
   if (!(bm.hingeU >= lm.mouthCorner - EPS) || bm.hingeU > g.head.lengthFrac * g.head.gillStart + EPS) fail('mouth_gills', 'jaw hinge not between mouth corner and gill opening');
   if (bm.hingeU + EPS < Math.min(lm.eye, g.head.lengthFrac * g.head.gillStart - .006)) fail('mouth_gills', 'jaw hinge in front of the eye line');
   if (FG.round2Check) { const r2 = FG.round2Check(bm); if (r2.length) fail('mouth_gills', r2[0]); }   /* round 2: see-through / floating teeth / eye protrusion → resample */

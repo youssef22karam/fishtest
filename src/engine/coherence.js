@@ -7,12 +7,13 @@
      FLAT_BODY_END     (L3)  the body loft's cross-section drops by more than half in one step at the rear, or the rear apex does not extend past the terminal-fin root
      MOUTH_CORNER_OPEN (L6)  resting mouth not sealed: skin loft open, jaw not at rest, or the pocket's cheek wall has a free (unwelded) edge inside the head near the corner
    Everything is a function of measured geometry + the generator's own axes; nothing is keyed to a species. */
-import { headDepthAt, corneaPoints, LIMBUS } from './eyegeo.js';
+import { headDepthAt, corneaPoints } from './eyegeo.js';
+import { LIMBUS, EYE_PROTRUSION_MIN, EYE_PROTRUSION_MAX, CORNEA_CLEAR, BURIAL_MAX, CORNEA_VIS_MIN } from './eyeband.js';
 import { jawEnv, jawIn, TEETH_SLACK } from './teethgeo.js';
 
 export const CODES = ['EYE_OUTSIDE_HEAD', 'EYE_SLICED', 'DETACHED_TEETH', 'FLAT_BODY_END', 'MOUTH_CORNER_OPEN'];
 const clamp = (x, a, b) => (x < a ? a : x > b ? b : x);
-const TH = { vis: .97 };
+const TH = { vis: CORNEA_VIS_MIN };
 
 /* ── L1 ── */
 function eyeOutside(fish, THREE, V) {
@@ -37,17 +38,22 @@ function eyeOutside(fish, THREE, V) {
 
 /* ── L5 ── */
 function eyeSliced(fish, THREE, V) {
-  const bm = fish.bm, infos = bm.eyes || [], v = m => V.push({ code: 'EYE_SLICED', msg: m }); if (fish.info.quality === 'lod') return;
+  if (fish.info.quality === 'lod') return;
+  const gr = fish.group, ro = gr.rotation.x; gr.rotation.x = 0; gr.updateMatrixWorld(true);
+  try { eyeSlicedLocal(fish, THREE, V); } finally { gr.rotation.x = ro; gr.updateMatrixWorld(true); }
+}
+function eyeSlicedLocal(fish, THREE, V) {
+  const bm = fish.bm, infos = bm.eyes || [], v = m => V.push({ code: 'EYE_SLICED', msg: m });
   const occ = []; fish.group.traverse(m => { if (m.isMesh && !m.isInstancedMesh && (m === fish.parts.body || m.userData.eyeSkin || m === fish.parts.jaw || m === fish.parts.operculum || m === fish.parts.upperJaw)) occ.push(m); });
-  fish.group.updateMatrixWorld(true);
   const rc = new THREE.Raycaster(), fr = {}; bm.frame(bm.lm.eye, fr);
   for (const i of infos) {
     if (i.vestigial) continue;
     const a = i.axis.clone().normalize(), c = i.center, R = i.R, fwd = new THREE.Vector3(-fr.tx, -fr.ty, 0), fp = fwd.addScaledVector(a, -fwd.dot(a)).normalize(), t1 = new THREE.Vector3().crossVectors(a, fp).normalize();
-    /* by construction: every cornea sample is outside the analytic head volume */
-    let worst = 0; for (const p of corneaPoints(THREE, c, a, fp, t1, R)) worst = Math.max(worst, headDepthAt(bm, p.addScaledVector(a, -.012 * R), clamp));
-    if (worst > .02 * R) v(`eye seat: cornea buried ${(worst / R).toFixed(2)} R in the head surface`);
-    if (i.protrusion > 1 / 3 + 1e-9) v('eye protrudes over a third of its diameter');
+    /* by construction: every cornea sample is outside the analytic head volume and protrusion lies inside the seat band (eyeband.js) */
+    let worst = 0; for (const p of corneaPoints(THREE, c, a, fp, t1, R)) worst = Math.max(worst, headDepthAt(bm, p.addScaledVector(a, -CORNEA_CLEAR * R), clamp));
+    if (worst > BURIAL_MAX * R) v(`eye seat: cornea buried ${(worst / R).toFixed(2)} R in the head surface`);
+    if (i.protrusion < EYE_PROTRUSION_MIN - 1e-9) v('eye seat: cornea buried below clearance band');
+    if (i.protrusion > EYE_PROTRUSION_MAX + 1e-9) v('eye protrudes over a third of its diameter');
     /* geometric: ray visibility of cornea sample points from the side and the front quarter */
     const cams = [a.clone(), a.clone().multiplyScalar(Math.cos(.61)).addScaledVector(fp, Math.sin(.61))]; let tot = 0, vis = 0;
     for (const cd of cams) for (let k = 0; k <= 24; k++) {
