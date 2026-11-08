@@ -1,18 +1,17 @@
 {
  "label": "after",
  "std": {
-  "n": 600,
+  "n": 300,
   "byClass": {
    "EYE_OUTSIDE_HEAD": 0,
-   "EYE_SLICED": 1,
+   "EYE_SLICED": 0,
    "DETACHED_TEETH": 0,
    "FLAT_BODY_END": 0,
    "MOUTH_CORNER_OPEN": 1
   },
-  "fishWith": 2,
+  "fishWith": 1,
   "examples": [
-   "31XQJDRH stingray EYE_SLICED: eye seat: cornea buried 0.16 R in the head surface | EYE_SLICED: eye seat: cornea buried 0.16 R in the head surface",
-   "PBQ23RS6 sturgeon MOUTH_CORNER_OPEN: cheek wall has 6 free edges inside the head at the mouth corner (up to 0.05 head lengths deep)"
+   "V66HKTNW carpetShark MOUTH_CORNER_OPEN: cheek wall has 2 free edges inside the head at the mouth corner (up to 0.11 head lengths deep)"
   ]
  },
  "wonRaw": {
@@ -20,24 +19,18 @@
   "unviable": 0,
   "byClass": {
    "EYE_OUTSIDE_HEAD": 0,
-   "EYE_SLICED": 6,
+   "EYE_SLICED": 0,
    "DETACHED_TEETH": 0,
    "FLAT_BODY_END": 1,
    "MOUTH_CORNER_OPEN": 0
   },
-  "fishWith": 7,
+  "fishWith": 1,
   "examples": [
-   "Grassbed ray-clownfish EYE_SLICED: eye seat: cornea buried 0.31 R in the head surface | EYE_SLICED: eye seat: cornea buried 0.31 R in the head surface",
-   "Oceanic marlin-manta-fish EYE_SLICED: eye seat: cornea buried 0.19 R in the head surface | EYE_SLICED: eye seat: cornea buried 0.19 R in the head surface",
-   "Oceanic manta-pipefish EYE_SLICED: eye seat: cornea buried 0.24 R in the head surface | EYE_SLICED: eye seat: cornea buried 0.24 R in the head surface",
-   "Shore moray-angelshark EYE_SLICED: eye seat: cornea buried 0.27 R in the head surface | EYE_SLICED: eye seat: cornea buried 0.27 R in the head surface",
-   "Shore shark-remora EYE_SLICED: eye seat: cornea buried 0.19 R in the head surface | EYE_SLICED: eye seat: cornea buried 0.18 R in the head surface",
-   "Brook marlin-flounder FLAT_BODY_END: rear cross-section drops 51% of the peduncle in one step (flat cut)",
-   "Grassbed stingray-wrass-bluegill EYE_SLICED: eye seat: cornea buried 0.25 R in the head surface | EYE_SLICED: eye seat: cornea buried 0.25 R in the head surface"
+   "Brook marlin-flounder FLAT_BODY_END: rear cross-section drops 51% of the peduncle in one step (flat cut)"
   ]
  },
  "wonShipped": {
-  "n": 283,
+  "n": 289,
   "byClass": {
    "EYE_OUTSIDE_HEAD": 0,
    "EYE_SLICED": 0,
