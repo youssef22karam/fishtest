@@ -162,16 +162,16 @@ function buildEyes(bm, seg, mats) {
     bm.rawSurface(uu, theta, surface); bm.surfaceNormal(uu, theta, axis);
     axis.add(new THREE.Vector3(-fr.tx * Math.max(g.head.eyeForward, EL.forwardMin) * .16, 0, 0)).normalize();
     /* seated: the sphere centre lies EYE_SEAT radii under the skin, so the dome protrudes (1 - EYE_SEAT) / 2 of the diameter */
-    const center = new THREE.Vector3(surface.x, surface.y, surface.z).addScaledVector(axis, -bm.eyeR * LAW.EYE_SEAT);
+    const center = new THREE.Vector3(surface.x, surface.y, surface.z).addScaledVector(axis, -bm.eyeR * EYE_SEAT);
     if (bm.law.eye.placement === 'oneSide') center.z = side * Math.max(Math.abs(center.z), bm.eyeR * .06);   /* thin side-flattened head: the centre stays on its own side of the mid-plane */
     const spec = { side, center, axis, R: bm.eyeR, forward: new THREE.Vector3(-fr.tx, -fr.ty, 0), up: new THREE.Vector3(fr.nx, fr.ny, 0), u: uu, surface: new THREE.Vector3(surface.x, surface.y, surface.z) };
     specs.push(spec);
-    if (EL.vestigial) { skin.push(EYE.buildVestigial(THREE, spec, seg)); infos.push({ center: center.clone(), axis: axis.clone(), R: bm.eyeR, protrusion: (1 - LAW.EYE_SEAT) / 2, vestigial: true, pupil: 'none', covers: {} }); continue; }
+    if (EL.vestigial) { skin.push(EYE.buildVestigial(THREE, spec, seg)); infos.push({ center: center.clone(), axis: axis.clone(), R: bm.eyeR, protrusion: EYE_PROTRUSION, vestigial: true, pupil: 'none', covers: {} }); continue; }
     /* round 2.1: no ring / socket / frame part — the head SKIN blends up onto the eyeball (eyegeo.buildSkinBlend, head skin material). Seat depth is refined against the real head surface. */
     spec.flat = ray; spec.theta = theta; const sk = EYE.skinCurvature(THREE, bm, spec, clamp), dl = EYE.seatDelta(spec, sk); let dl2 = dl; if (dl > 0) { const c0 = spec.center.clone(); spec.center.addScaledVector(axis, -dl); if (bm.law.eye.placement === 'oneSide') spec.center.z = side * Math.max(Math.abs(spec.center.z), bm.eyeR * .06); dl2 = Math.max(0, c0.sub(spec.center).dot(axis)); sk.z0 += dl2; }
-    { const cart = bm.a.gills !== 'opercular', lf = EYE.seatLift(THREE, bm, spec, clamp, Math.max(0, dl2 + 2 * bm.eyeR * ((cart ? EYE.LIFT_MAX_PROTRUSION.cart : EYE.LIFT_MAX_PROTRUSION.bony) - (1 - LAW.EYE_SEAT) / 2)));   /* round 6H L5: lift until the cornea is clear of the head */
+    { const lf = EYE.seatLift(THREE, bm, spec, clamp, Math.max(0, dl2 + 2 * bm.eyeR * (EYE_PROTRUSION_MAX - EYE_PROTRUSION)));   /* round 6H.3a L5: lift inside the eyeband.js seat band until the cornea is clear */
       if (lf > 0) { spec.center.addScaledVector(axis, lf); if (bm.law.eye.placement === 'oneSide') spec.center.z = side * Math.max(Math.abs(spec.center.z), bm.eyeR * .06); sk.z0 -= lf; dl2 -= lf; } }
-    const organ = EYE.buildOrgan(THREE, spec, EL, seg); opaque.push(...organ.opaque); glass.push(...organ.glass); organ.info.protrusion = (1 - LAW.EYE_SEAT - dl2 / bm.eyeR) / 2; infos.push(organ.info);
+    const organ = EYE.buildOrgan(THREE, spec, EL, seg); opaque.push(...organ.opaque); glass.push(...organ.glass); organ.info.protrusion = (1 - EYE_SEAT - dl2 / bm.eyeR) / 2; infos.push(organ.info);
     const blend = EYE.buildSkinBlend(THREE, spec, seg, sk); infos[infos.length - 1].seatExtra = dl2 / bm.eyeR;
     blends.push(blend); infos[infos.length - 1].rimH = blend.userData.rimH;
   }

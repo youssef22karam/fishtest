@@ -4,7 +4,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { GLTFExporter } from 'three/addons/exporters/GLTFExporter.js';
 import { installProcUI } from './procui.js';
 import * as LAW from './laws.js';
-import { eyeBand, eyeMargin, GILL_START_MAX } from './eyeband.js';
+import { eyeBand, eyeMargin, GILL_START_MAX, EYE_SEAT, EYE_PROTRUSION, EYE_PROTRUSION_MAX } from './eyeband.js';
 import * as MOUTH from './mouthgeo.js';
 import * as GILL from './gillgeo.js';
 import * as DISC from './discgeo.js';
