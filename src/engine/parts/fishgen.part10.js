@@ -151,7 +151,7 @@ function irisColor(g, EL, cart = false) {
 }
 function buildEyes(bm, seg, mats) {
   const g = bm.g, out = []; if (g.head.eyeSide === 'none') return out; const fr = {}, s = {}; const u = bm.lm.eye; bm.frame(u, fr); bm.section(u, s);
-  const y = bm.eyeY; const list = g.head.eyeSide === 'both' ? [[1, y, u], [-1, y, u]] : g.head.eyeSide === 'left' ? [[1, y, u], [1, Math.max(-s.dDn * .5, y - bm.eyeR * 1.9), u + .018]] : [[-1, y, u], [-1, Math.max(-s.dDn * .5, y - bm.eyeR * 1.9), u + .018]];
+  const y = bm.eyeY; const list = g.head.eyeSide === 'both' ? [[1, y, u], [-1, y, u]] : g.head.eyeSide === 'left' ? [[1, y, u], [1, y, u + 2.3 * bm.eyeR / bm.L]] : [[-1, y, u], [-1, y, u + 2.3 * bm.eyeR / bm.L]];
   const EL = bm.law.eye, ray = ['ray', 'benthicShark'].includes(bm.a.family), specs = [], opaque = [], glass = [], skin = [], infos = [], blends = [];
   for (const [side, yy, uu] of list) {
     bm.frame(uu, fr); bm.section(uu, s);
@@ -162,14 +162,16 @@ function buildEyes(bm, seg, mats) {
     bm.rawSurface(uu, theta, surface); bm.surfaceNormal(uu, theta, axis);
     axis.add(new THREE.Vector3(-fr.tx * Math.max(g.head.eyeForward, EL.forwardMin) * .16, 0, 0)).normalize();
     /* seated: the sphere centre lies EYE_SEAT radii under the skin, so the dome protrudes (1 - EYE_SEAT) / 2 of the diameter */
-    const center = new THREE.Vector3(surface.x, surface.y, surface.z).addScaledVector(axis, -bm.eyeR * LAW.EYE_SEAT);
+    const center = new THREE.Vector3(surface.x, surface.y, surface.z).addScaledVector(axis, -bm.eyeR * EYE_SEAT);
     if (bm.law.eye.placement === 'oneSide') center.z = side * Math.max(Math.abs(center.z), bm.eyeR * .06);   /* thin side-flattened head: the centre stays on its own side of the mid-plane */
     const spec = { side, center, axis, R: bm.eyeR, forward: new THREE.Vector3(-fr.tx, -fr.ty, 0), up: new THREE.Vector3(fr.nx, fr.ny, 0), u: uu, surface: new THREE.Vector3(surface.x, surface.y, surface.z) };
     specs.push(spec);
-    if (EL.vestigial) { skin.push(EYE.buildVestigial(THREE, spec, seg)); infos.push({ center: center.clone(), axis: axis.clone(), R: bm.eyeR, protrusion: (1 - LAW.EYE_SEAT) / 2, vestigial: true, pupil: 'none', covers: {} }); continue; }
+    if (EL.vestigial) { skin.push(EYE.buildVestigial(THREE, spec, seg)); infos.push({ center: center.clone(), axis: axis.clone(), R: bm.eyeR, protrusion: EYE_PROTRUSION, vestigial: true, pupil: 'none', covers: {} }); continue; }
     /* round 2.1: no ring / socket / frame part — the head SKIN blends up onto the eyeball (eyegeo.buildSkinBlend, head skin material). Seat depth is refined against the real head surface. */
     spec.flat = ray; spec.theta = theta; const sk = EYE.skinCurvature(THREE, bm, spec, clamp), dl = EYE.seatDelta(spec, sk); let dl2 = dl; if (dl > 0) { const c0 = spec.center.clone(); spec.center.addScaledVector(axis, -dl); if (bm.law.eye.placement === 'oneSide') spec.center.z = side * Math.max(Math.abs(spec.center.z), bm.eyeR * .06); dl2 = Math.max(0, c0.sub(spec.center).dot(axis)); sk.z0 += dl2; }
-    const organ = EYE.buildOrgan(THREE, spec, EL, seg); opaque.push(...organ.opaque); glass.push(...organ.glass); organ.info.protrusion = (1 - LAW.EYE_SEAT - dl2 / bm.eyeR) / 2; infos.push(organ.info);
+    { const lf = EYE.seatLift(THREE, bm, spec, clamp, Math.max(0, dl2 + 2 * bm.eyeR * (EYE_PROTRUSION_MAX - EYE_PROTRUSION)));   /* round 6H.3a L5: lift inside the eyeband.js seat band until the cornea is clear */
+      if (lf > 0) { spec.center.addScaledVector(axis, lf); if (bm.law.eye.placement === 'oneSide') spec.center.z = side * Math.max(Math.abs(spec.center.z), bm.eyeR * .06); sk.z0 -= lf; dl2 -= lf; } }
+    const organ = EYE.buildOrgan(THREE, spec, EL, seg); opaque.push(...organ.opaque); glass.push(...organ.glass); organ.info.protrusion = (1 - EYE_SEAT - dl2 / bm.eyeR) / 2; infos.push(organ.info);
     const blend = EYE.buildSkinBlend(THREE, spec, seg, sk); infos[infos.length - 1].seatExtra = dl2 / bm.eyeR;
     blends.push(blend); infos[infos.length - 1].rimH = blend.userData.rimH;
   }
@@ -228,15 +230,14 @@ function buildSpecials(bm, mats) {
       }
     }
     for (let i = 0; i < N; i++) for (let j = 0; j < M; j++) { const a = i * M + j, b = i * M + (j + 1) % M, c = a + M, d = b + M; idx.push(a, b, c, b, d, c); }
+    const rings = []; for (let i = 0; i <= N; i++) { const r = []; for (let j = 0; j < M; j++) { const o = (i * M + j) * 3; r.push([pos[o], pos[o + 1], pos[o + 2]]); } rings.push(r); }   /* round 6H: ring samples, rostral teeth root IN this edge */
     const tip = pos.length / 3; pos.push(tipX + fwdX * len * .015, tipY, 0);
     for (let j = 0; j < M; j++) idx.push(tip, N * M + j, N * M + (j + 1) % M);
-    const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); geo.setIndex(idx); geo.computeVertexNormals(); skinAttributes(geo, bm); return geo;
+    const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); geo.setIndex(idx); geo.computeVertexNormals(); skinAttributes(geo, bm); geo.userData.rings = rings; return geo;
   };
   if (sp === 'bill' || sp === 'sword') { add(loftSpike(.006, g.head.specialLen * L, sp === 'sword' ? .3 : .55, sp === 'sword' ? 1.1 : .6, .05, 0), mats.body); }
-  else if (sp === 'rostrum' || sp === 'paddle') { const len = g.head.specialLen * L, w = g.head.specialWidth * L * (sp === 'paddle' ? 2 : 1); add(loftSpike(.008, len, sp === 'paddle' ? .22 : .14, Math.max(.6, w / Math.max(.001, bm.bp.width(.06) * L)), .01, sp === 'paddle' ? .5 : .15), mats.body);
-    if (sp === 'rostrum') { const n = Math.max(6, Math.floor(len / (0.03 * L))), cone = new THREE.ConeGeometry(1, 1, 4, 1); cone.translate(0, 0.5, 0); const inst = new THREE.InstancedMesh(cone, mats.tooth, n * 2); const M = new THREE.Matrix4(), P = new THREE.Vector3(), Q = new THREE.Quaternion(), Sc = new THREE.Vector3(0.004 * L, 0.03 * L, 0.004 * L), up = new THREE.Vector3(0, 1, 0); let k = 0;
-      for (let i = 0; i < n; i++) for (const side of [1, -1]) { P.set(snX + len * 0.05 + (i + 0.5) / n * len * 0.85, snY, side * w * 0.5); Q.setFromUnitVectors(up, new THREE.Vector3(0, 0, side)); M.compose(P, Q, Sc); inst.setMatrixAt(k++, M); }
-      cone.setAttribute('aJaw', new THREE.InstancedBufferAttribute(new Float32Array(n * 2), 1)); inst.frustumCulled = false; out.push(inst); } }
+  else if (sp === 'rostrum' || sp === 'paddle') { const len = g.head.specialLen * L, w = g.head.specialWidth * L * (sp === 'paddle' ? 2 : 1); const blade = add(loftSpike(.008, len, sp === 'paddle' ? .22 : .14, Math.max(.6, w / Math.max(.001, bm.bp.width(.06) * L)), .01, sp === 'paddle' ? .5 : .15), mats.body);
+    if (sp === 'rostrum') out.push(ROSTRUM.buildRostralTeeth(THREE, blade, len, L, mats.tooth)); }
   else if (sp === 'esca') { for (const m of APP.buildLure(bm, mats, GH)) { out.push(m); } }
   else if (sp === 'whip') { for (const m of APP.buildWhip(bm, mats, GH)) out.push(m); }
   return out;

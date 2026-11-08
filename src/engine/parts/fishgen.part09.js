@@ -104,14 +104,20 @@ class BodyModel {
     this.disc = DISC.isDisc(this) ? DISC.plan(this) : null;   /* round 6A: the disc plan is one solid, opaque surface (discgeo.js) */
     if (this.disc) { this.discMargin = 0; this.maxD = this.disc.Hc; }
     this._fr = {}; this._s = {};
+    /* round 6H (L3 termination law): the body never ends in a flat cut. Past u = 1 the loft continues as a rounded (elliptical) rear cap whose axial length is 0.75 x the
+       peduncle's largest half-extent; the terminal fin root (at u = 1) is therefore buried inside the body volume, and the cross-section falls to zero smoothly (sqrt profile). */
+    this.capU = 0;
+    { const s1 = {}; this.section(1, s1); this.capU = Math.max(.004, .75 * Math.max(s1.dUp, s1.dDn, s1.w) / this.L); }
   }
   frame(u, out) {
+    if (u > 1) { const a = this.spine[this.spine.length - 1]; out.tx = -Math.cos(a.phi); out.ty = -Math.sin(a.phi); out.px = a.x + out.tx * (u - 1) * this.L; out.py = a.y + out.ty * (u - 1) * this.L; out.nx = out.ty; out.ny = -out.tx; return out; }
     const sp = this.spine;
     if (u < 0) { const a = sp[0]; out.tx = -Math.cos(a.phi); out.ty = -Math.sin(a.phi); out.px = a.x + out.tx * u * this.L; out.py = a.y + out.ty * u * this.L; out.nx = out.ty; out.ny = -out.tx; return out; }
     const t = clamp(u, 0, 1) * (sp.length - 1), i = Math.min(sp.length - 2, Math.floor(t)), f = t - i, a = sp[i], b2 = sp[i + 1]; const phi = a.phi + (b2.phi - a.phi) * f;
     out.px = a.x + (b2.x - a.x) * f; out.py = a.y + (b2.y - a.y) * f; out.tx = -Math.cos(phi); out.ty = -Math.sin(phi); out.nx = out.ty; out.ny = -out.tx; return out;
   }
   section(u, s) {
+    if (u > 1) { const q = (u - 1) / Math.max(1e-9, this.capU), k = Math.sqrt(Math.max(0, 1 - q * q)); this.section(1, s); s.dUp *= k; s.dDn *= k; s.w *= k; s.coreW = s.w; if (s.rim !== undefined) s.rim *= k; return s; }
     if (this.disc) return DISC.section(this, u, s);
     const g = this.g, b = g.body, L = this.L, d = this.bp.depth(u) * L, w = this.bp.width(u) * L;
     if (this.billStart !== null && u < .004) {
@@ -208,6 +214,7 @@ function buildBodyGeometry(bm, S, R) {
     for (const e of (bm.disc ? DISC.extraStations(bm) : GILL.extraStations(bm))) if (e > .006 && e < .98) Ubase.push(e);
     Ubase.sort((a, b) => a - b); for (let i = Ubase.length - 1; i > 0; i--) if (Ubase[i] - Ubase[i - 1] < 1e-5) Ubase.splice(i, 1);
   }
+  if (bm.capU > 0) { const NC = bm.lod ? 3 : 7; for (let k = 1; k <= NC; k++) Ubase.push(1 + bm.capU * Math.sin(k / NC * Math.PI / 2 * .94)); }   /* round 6H: rounded rear cap */
   const stations = Ubase.length - 1;
   const nV = (stations + 1) * R + 2, pos = new Float32Array(nV * 3), ab = new Float32Array(nV * 4), idx = [], us = new Float64Array(stations + 1);
   const fr = {}, s = {}, p = {}; let v = 0;
@@ -216,7 +223,7 @@ function buildBodyGeometry(bm, S, R) {
     us[i] = u; bm.frame(u, fr); bm.section(u, s);
     for (let j = 0; j < R; j++) { bm.point(u, -Math.PI / 2 + j / R * TAU, p, fr, s); pos[v * 3] = p.x; pos[v * 3 + 1] = p.y; pos[v * 3 + 2] = p.z; ab[v * 4] = u; ab[v * 4 + 1] = j / R; ab[v * 4 + 2] = p.mouth; v++; } }
   bm.frame(bm.billStart === null ? 0 : bm.billStart, fr); const snout = v++; pos[snout * 3] = fr.px - fr.tx * .0002 * bm.L; pos[snout * 3 + 1] = fr.py - fr.ty * .0002 * bm.L; ab[snout * 4] = bm.billStart === null ? 0 : bm.billStart; ab[snout * 4 + 1] = .25;
-  bm.frame(1, fr); const tail = v++; pos[tail * 3] = fr.px; pos[tail * 3 + 1] = fr.py; ab[tail * 4] = 1; ab[tail * 4 + 1] = .5;
+  bm.frame(1 + bm.capU, fr); const tail = v++; pos[tail * 3] = fr.px; pos[tail * 3 + 1] = fr.py; ab[tail * 4] = 1 + bm.capU; ab[tail * 4 + 1] = .5;
   for (let i = 0; i < stations; i++) for (let j = 0; j < R; j++) { const a = i * R + j, b2 = i * R + (j + 1) % R, c2 = (i + 1) * R + j, d = (i + 1) * R + (j + 1) % R; idx.push(a, b2, c2, b2, d, c2); }
   for (let j = 0; j < R; j++) { idx.push(snout, (j + 1) % R, j, tail, stations * R + j, stations * R + (j + 1) % R); }
   const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.BufferAttribute(pos, 3)); geo.setAttribute('aBody', new THREE.BufferAttribute(ab, 4)); geo.setIndex(idx); geo.computeVertexNormals();

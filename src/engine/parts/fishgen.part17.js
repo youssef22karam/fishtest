@@ -115,7 +115,7 @@ RULE('fin_scale_cap', 'No fin is longer than ~90% of the body (guards crossed an
   if (f.anal.present) clampLog(g, log, 'fin_scale_cap', 'fins.anal.height', .03, Math.max(.3, .8 * b.fineness));
 });
 /** analytic structural audit used to gate every generated fish (returns a list of issues, empty = sound) */
-function structuralAudit(g) {
+function structuralAudit(g, opts = {}) {
   const out = [], a = anatomyProfile(g), plan = planOf(g), c = g.fins.caudal, f = g.fins, b = g.body;
   const noTailOk = (a.locks && a.locks['fins.caudal.present'] === false) || ['upright', 'ray', 'knife', 'flatShark'].includes(plan);
   if (!c.present && !noTailOk) out.push('tail: no caudal fin on a swimming body plan');
@@ -133,6 +133,7 @@ function structuralAudit(g) {
     if (f.anal.present && f.anal.height / b.fineness > .85) out.push('fin: anal fin taller than 85% of body length');
   }
   if (b.fineness < 1.3 || b.fineness > 17.1) out.push('body: fineness out of range');
+  for (const v of coherenceAudit(g, { mesh: !opts.analytic })) out.push(v.code + ': ' + v.msg);   /* round 6H: laws L1-L6, the one shared audit */
   return out;
 }
 

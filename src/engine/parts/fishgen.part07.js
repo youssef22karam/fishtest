@@ -54,7 +54,7 @@ RULE('fin_segment_balance', 'Second dorsal does not overpower the first; finlets
   clampLog(g, log, 'fin_segment_balance', 'fins.pectoral.baseLen', .06, a.family === 'ray' ? .9 : .65);
 });
 RULE('oral_gill_separation', 'The gill chamber begins behind the mouth articulation', (g, lm, log) => {
-  clampLog(g, log, 'oral_gill_separation', 'head.gillStart', Math.max(.45, lm.mouthCorner / g.head.lengthFrac + .05), .78);
+  clampLog(g, log, 'oral_gill_separation', 'head.gillStart', Math.max(.45, lm.mouthCorner / g.head.lengthFrac + .05), GILL_START_MAX);
 });
 RULE('habitat_ecology', 'Lineage matches salinity, depth zone and thermal habitat (unless explicitly adapted)', (g, lm, log) => {
   const habitat = HABITATS[g.meta.habitat]; if (!habitat || g.meta.adapted || cladeAllowed(g.meta.clade, habitat)) return;
