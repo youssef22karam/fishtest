@@ -8,9 +8,8 @@
      · covers (clean on/off by plan/niche): clear adipose window over the front and rear edges; nictitating lower lid over the lower third.
    Vertex attribute aEye = (a, b, kind): kind 0 sclera · 1 iris (a = radial 0..1, b = angle) · 2 pupil · 3 cornea · 4 adipose · 5 limbal funnel · 6 nictitating lid.
    Everything is built in the head's own coordinates, so the eye moves with the head and mirrors exactly between sides. */
-import { EYE_SEAT } from './laws.js';
-
-export const LIMBUS = .62;            /* polar angle (rad) of the corneal rim measured from the optical axis */
+import { EYE_SEAT, EYE_SEAT_MAX, EYE_PROTRUSION_MAX, LIMBUS, CORNEA_REACH, CORNEA_CLEAR } from './eyeband.js';
+export { LIMBUS, CORNEA_REACH };
 export const IRIS_RECESS = .03;       /* iris plane depth behind the limbus plane, in eyeball radii */
 
 /** pupil half-extents (fraction of the iris radius) along the head-forward (tu) and head-up (tv) directions */
@@ -121,7 +120,7 @@ export const SKIN_RIM_TARGET = .055;
 export function seatDelta(spec, sk) {
   const R = spec.R, Rin = R * 1.018, rIn = Rin * Math.sin(BLEND_IN), zIn = Rin * Math.cos(BLEND_IN); let hmax = 0;
   for (let i = 0; i < 24; i++) { const ph = i / 24 * Math.PI * 2, f = rIn * Math.cos(ph), v = rIn * Math.sin(ph); hmax = Math.max(hmax, zIn - (sk.z0 + sk.gf * f + sk.gv * v - .5 * (sk.kf * f * f + sk.kv * v * v))); }
-  const cap = Math.max(0, R * Math.cos(LIMBUS + .04) - sk.z0);
+  const cap = Math.max(0, Math.min(R * (EYE_SEAT_MAX - EYE_SEAT), R * EYE_SEAT_MAX - sk.z0));
   return Math.max(0, Math.min(cap, hmax - SKIN_RIM_TARGET * 2 * R));
 }
 export function buildSkinBlend(THREE, spec, seg, sk) {
@@ -152,3 +151,43 @@ export function buildVestigial(THREE, spec, seg) {
 }
 
 export function mergeParts(THREE, list) { return merge(THREE, list); }
+
+
+/* ───────── ROUND 6H.3a: EYE-SEAT BAND (L5) — cornea sits in the bounded band from eyeband.js ─────────
+   The seat is refined against the REAL local head/dome surface: sample points on the corneal cap (out to CORNEA_REACH) are tested against the local analytic section
+   (on flattened plans — disc + ray/benthicShark — against the local dome height at P.z, not the midline peak). Any buried point lifts the eyeball along its optical axis
+   within the eyeband.js protrusion cap (EYE_PROTRUSION_MAX = 1/3 diameter). */
+export const LIFT_MAX_PROTRUSION = { bony: EYE_PROTRUSION_MAX, cart: EYE_PROTRUSION_MAX };
+export function corneaPoints(THREE, c, a, tu, tv, R, k = 1 + CORNEA_CLEAR) {
+  const pts = [c.clone().addScaledVector(a, R * k)];
+  for (const f of [.35, .7, 1]) for (let j = 0; j < 8; j++) { const al = CORNEA_REACH * f, ph = j / 8 * Math.PI * 2, d = a.clone().multiplyScalar(Math.cos(al)).addScaledVector(tu, Math.sin(al) * Math.cos(ph)).addScaledVector(tv, Math.sin(al) * Math.sin(ph)); pts.push(c.clone().addScaledVector(d, R * k)); }
+  return pts;
+}
+/** depth (m, >= 0) by which point P lies inside the analytic head/dome volume (0 = on / outside the local skin) */
+export function headDepthAt(bm, P, clamp) {
+  const fr = bm._hfr || (bm._hfr = {}), s = bm._hs || (bm._hs = {}), u = clamp((bm.headX - P.x) / bm.L, .003, .999); bm.frame(u, fr); bm.section(u, s);
+  const ly = (P.x - fr.px) * fr.nx + (P.y - fr.py) * fr.ny, az = Math.abs(P.z);
+  if (bm.disc) {
+    if (az >= s.w) return 0;
+    const r = s.rim, wi = Math.max(1e-9, s.w - r), y0 = ly >= 0 ? s.dUp : s.dDn, p = ly >= 0 ? s.pU : s.pD;
+    const ySurf = az <= wi ? r + (y0 - r) * Math.pow(Math.max(0, 1 - (az / wi) ** 2), p) : r * Math.sqrt(Math.max(0, 1 - ((az - wi) / Math.max(1e-9, r)) ** 2));
+    return Math.max(0, Math.min(s.w - az, ySurf - Math.abs(ly)));
+  }
+  const fam = bm.a && bm.a.family;
+  if (fam === 'ray' || fam === 'benthicShark') {
+    if (az >= s.w) return 0;
+    const y0 = ly >= 0 ? s.dUp : s.dDn, yn = ly >= 0 ? s.nD : s.nV, t = clamp((az / Math.max(s.w, 1e-8) - .08) / .88, 0, 1);
+    const taper = 1 - (fam === 'ray' ? .90 : .78) * t * t * (3 - 2 * t);
+    const ySurf = y0 * Math.pow(Math.max(0, 1 - Math.min(1, Math.pow(az / Math.max(1e-9, s.w), s.n))), 1 / yn) * taper;
+    return Math.max(0, Math.min(s.w - az, ySurf - Math.abs(ly)));
+  }
+  if (!(ly > -s.dDn && ly < s.dUp)) return 0;
+  const hw = bm.halfWidthAtY(s, clamp(ly, -s.dDn * .999, s.dUp * .999)), dz = hw - az; if (dz <= 0) return 0;
+  const yR = ly > 0 ? s.dUp : s.dDn; return Math.min(dz, yR - Math.abs(ly));
+}
+export function seatLift(THREE, bm, spec, clamp, maxLift) {
+  const F = eyeFrame(THREE, spec.axis, spec.forward, spec.up), R = spec.R, c0 = spec.center.clone(), tol = CORNEA_CLEAR * R; let lift = 0;
+  const worst = l => { const c = c0.clone().addScaledVector(F.a, l); let w = 0; for (const p of corneaPoints(THREE, c, F.a, F.tu, F.tv, R)) w = Math.max(w, headDepthAt(bm, p.addScaledVector(F.a, -tol), clamp)); return w; };
+  for (let i = 0; i < 24 && worst(lift) > 0; i++) { lift += Math.max(.002 * R, worst(lift) * .85); if (lift >= maxLift) { lift = maxLift; break; } }
+  return Math.min(lift, Math.max(0, maxLift));
+}

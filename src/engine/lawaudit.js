@@ -1,6 +1,7 @@
 /* LAW AUDIT — measured assertions over a built creature: eyes, mouth constructions, flattened-plan surfaces.
    Every rule reads only axes (plan / niche / swim / depth) and measured geometry — nothing is keyed to a named animal. */
-import { gapeLimit, eyeRoom, EYE_GEO, eyeLaw, mouthLaw, EYE_PROTRUSION_MAX, DISC_DEPTH_MAX, TUBE_MAX, CAVITY_MAX } from './laws.js';
+import { gapeLimit, eyeRoom, EYE_GEO, eyeLaw, mouthLaw, DISC_DEPTH_MAX, TUBE_MAX, CAVITY_MAX } from './laws.js';
+import { EYE_PROTRUSION_MIN, EYE_PROTRUSION_MAX } from './eyeband.js';
 
 export function auditLaws(fish) {
   const E = [], err = m => E.push(m), bm = fish.bm, g = bm.g, L = bm.L, headL = bm.h * L, ax = bm.ax, EL = bm.law.eye, M = bm.law.mouth;
@@ -11,6 +12,7 @@ export function auditLaws(fish) {
   if (g.head.eyeSide !== 'none' && eyes.length !== 2) err('eye count is not exactly 2');
   for (const e of eyes) {
     if (e.protrusion > EYE_PROTRUSION_MAX + 1e-9) err('eye protrusion above 1/3 of its diameter');
+    if (!e.vestigial && e.protrusion < EYE_PROTRUSION_MIN - 1e-9) err('eye buried below cornea clearance');
     const ratio = 2 * e.R / headL;
     if (ratio > EL.ratioBand[1] * 1.02 + 1e-6) err(`eye ${ratio.toFixed(3)} of head above the ${EL.regime} band`);
     if (ratio < Math.min(EL.ratioBand[0], eyeRoom(g, bm.bp, bm.h) * EYE_GEO) * .97 - 1e-6) err(`eye ${ratio.toFixed(3)} of head below the ${EL.regime} band`);

@@ -16,10 +16,12 @@ export const initProcGen = FG => { ENGINE = FG; };
 const MAX_TRIES = 120;
 
 /** Gate one trait vector. Returns a complete fish record or { fail }. */
-function realise(t, seed) {
+function realise(t, seed, mesh = false) {
   const hash = genomeHash(t), name = nameFishFromTraits(t, hash);
   const g = validate(t).ok ? makeEngineGenome(ENGINE, t, { seed, hash, name }) : null;
   const rep = g ? validate(t, g, ENGINE) : validate(t);
+  /* round 6H: the shared coherence audit (laws L1–L6) is part of the gate. Roots use its analytic part (cheap, 10,000-seed scale) — except one-sided plans (flatfish: the second eye sits behind the first, on terrain only the built head shows), which build the mesh too; mutants and offspring build the mesh and run it all. */
+  if (g && rep.ok && ENGINE.coherenceAudit) { const v = ENGINE.coherenceAudit(g, { mesh }); if (v.length) { rep.ok = false; rep.failures = (rep.failures || []).concat(v.map(x => ({ inv: 'coherence', msg: x.code + ': ' + x.msg }))); } }
   if (!rep.ok) { STATS.rejected++; for (const f of rep.failures) STATS.byInvariant[f.inv + ': ' + f.msg.replace(/[-\d.]+/g, '#')] = (STATS.byInvariant[f.inv + ': ' + f.msg.replace(/[-\d.]+/g, '#')] || 0) + 1; return { fail: rep }; }
   STATS.accepted++;
   return { traits: t, genome: g, report: rep, hash, name, seed, clade: t.clade, lineage: t.lineage };
@@ -37,7 +39,7 @@ function rootFish(token) {
 function mutantFish(parent, salt) {
   const seed = `${parent.seed}~${salt}`;
   for (let k = 0; k < MAX_TRIES; k++) {
-    const rng = makeRng(seed + '#' + k), r = realise(mutateTraits(parent.traits, rng, .1 + .05 * rng.next()), seed);
+    const rng = makeRng(seed + '#' + k), r = realise(mutateTraits(parent.traits, rng, .1 + .05 * rng.next()), seed, true);
     if (r.traits) { r.attempts = k + 1; return r; }
   }
   return { ...parent, seed };
@@ -46,7 +48,7 @@ const wrap = s => (/[~^]/.test(s) ? `(${s})` : s);
 function childFish(a, b, salt) {
   const seed = `${a.seed}^${wrap(b.seed)}${salt ? '.' + salt : ''}`;
   for (let k = 0; k < MAX_TRIES; k++) {
-    const rng = makeRng(seed + '#' + k), r = realise(breedTraits(a.traits, b.traits, rng), seed);
+    const rng = makeRng(seed + '#' + k), r = realise(breedTraits(a.traits, b.traits, rng), seed, true);
     if (r.traits) { r.attempts = k + 1; return r; }
   }
   return { ...a, seed };

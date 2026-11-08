@@ -5,8 +5,10 @@ const FG_JAW_MAX = 40;
    Every rule reads only axes (plan / niche / swim / depth) and measured geometry — nothing is keyed to a named animal. */
 import { auditLaws } from './lawaudit.js';
 import { APPENDAGE_CAP, barbelLaw, lureLaw, whipLen } from './laws.js';
+import { EYE_PROTRUSION_MIN, EYE_PROTRUSION_MAX } from './eyeband.js';
 import { auditHead } from './headaudit.js';
 import { OP } from './headlaw.js';
+import { auditCoherence } from './coherence.js';
 
 const EPS = 1e-6;
 export function auditAnatomy(fish, THREE) {
@@ -42,7 +44,7 @@ export function auditAnatomy(fish, THREE) {
       const k = mesh.geometry.getAttribute('aEye'), seen = new Set(); for (let i = 0; i < k.count; i++) seen.add(Math.round(k.getZ(i)));
       for (const need of [0, 1, 2, 5]) if (!seen.has(need)) err('eyeball lacks sclera / iris / pupil geometry');
     }
-    for (const i of infos) { if (i.protrusion > 1 / 3 + 1e-9) err('eye protrudes more than a third of its diameter'); if (!i.vestigial && !(i.irisRecess > 0)) err('iris not recessed'); }
+    for (const i of infos) { if (i.protrusion > EYE_PROTRUSION_MAX + 1e-9 || (!i.vestigial && i.protrusion < EYE_PROTRUSION_MIN - 1e-9)) err('eye protrudes more than a third of its diameter'); if (!i.vestigial && !(i.irisRecess > 0)) err('iris not recessed'); }
     if (infos.length === 2 && g.head.eyeSide === 'both') {
       const [a, b] = infos.map(i => i.center);
       if (Math.abs(a.z + b.z) > 5e-4 * L || Math.abs(a.y - b.y) > 5e-4 * L || Math.abs(a.x - b.x) > 5e-4 * L) err('eyes not symmetric in front projection');
@@ -92,5 +94,6 @@ export function auditAnatomy(fish, THREE) {
   }
   E.push(...auditLaws(fish));
   E.push(...auditHead(fish, THREE));
+  if (detail) E.push(...auditCoherence(fish, THREE).map(v => v.code + ': ' + v.msg));   /* round 6H: laws L1–L6 (shared audit) */
   return E;
 }

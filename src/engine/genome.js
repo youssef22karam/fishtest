@@ -2,6 +2,7 @@
    seed string -> RNG -> clade -> trait vector (sampled strictly inside the clade envelope).
    Pure JS; validation and engine wiring live in validate.js / mapping.js / procgen.js. */
 import { AX, AX_KEYS, DISC_KEYS, PALETTES, CLADES, CLADE_IDS, envelope, SIZE_BANDS } from './clades.js';
+import { eyeBand } from './eyeband.js';
 
 /* ── deterministic PRNG (same construction as the engine's RNG: cyrb128 → sfc32) ── */
 export function cyrb128(str) {
@@ -64,8 +65,14 @@ export function sampleTraits(rng, cladeId, lineage) {
   const P = PALETTES[t.palette], band = P.h[Math.floor(rng.next() * P.h.length)];
   t.hue = rng.range(band[0], band[1]); t.sat = rng.range(P.s[0], P.s[1]); t.lit = rng.range(P.l[0], P.l[1]);
   t.eyeIdx = Math.floor(rng.next() * P.eye.length); t.glowH = Math.round(rng.range(165, 205));
+  /* round 6H.2: the eye-position envelope is DERIVED from the shared feasible band (eyeband.js), not a fixed window. A draw that overshoots the band of
+     its OWN head (long heads: gill front, eye radius and seating allowance all scale with h) is REFLECTED back inside it (never clamped onto the edge, so
+     draws spread over the band); draws already inside the band are untouched — lineages whose envelope fits their band sample exactly as before. */
+  { const b = eyeBandOf(t); if (b && t.eyeU > b.seat) { const r = b.seat - (t.eyeU - b.seat); t.eyeU = clamp(r, b.lo, b.seat); } }
   return settle(t, env, rng);
 }
+/** the feasible eye band for this trait vector's own head (null when eyeless / no head) */
+function eyeBandOf(t) { return t.eyeSide && t.eyeSide !== 'none' && t.headLen > 0 ? eyeBand(t.headLen, t.eyeSize, t.eyeSide) : null; }
 
 /** Force derived consistency (never leaves the envelope; only tidies dependent axes). */
 export function settle(t, env, rng) {
@@ -74,6 +81,7 @@ export function settle(t, env, rng) {
   if (t.teeth === 'none') t.teethCount = 0;
   else if (t.teethCount < 1) t.teethCount = Math.max(1, env.r.teethCount[1] ? Math.min(env.r.teethCount[1], 4) : 4);
   if (!env.deep) t.photophores = 0;
+  { const b = eyeBandOf(t); if (b) t.eyeU = clamp(t.eyeU, b.lo, b.seat); }   /* round 6H.2: idempotent — mutation / breeding stay inside the same band */
   if (t.special !== 'none' && t.special !== 'hammer' && t.special !== 'esca') t.special = 'none';
   return t;
 }
