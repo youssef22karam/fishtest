@@ -74,6 +74,16 @@ export function lipPoint(bm, u, side, H, inset = 0, out = {}) {
   out.x = p.x + fr.nx * p.ly * off; out.y = p.y + fr.ny * p.ly * off; out.z = p.z + p.lz * off; out.ly = p.ly; out.lz = p.lz; out.tx = fr.tx; out.ty = fr.ty; out.nx = fr.nx; out.ny = fr.ny; return out;
 }
 
+/* ROUND 6H.3b — CORNER_SEAL (L6, by construction, every mouth placement). Before any triangle is dropped the pocket is a closed bag: the rim loop is joined at both hinge
+   corners, the rings close onto the throat cap, each cheek wall folds onto both lip copies (its rear edge at the hinge welds onto itself at the lip corner). The ONLY thing that
+   ever opened the corner was the round-4 centre-band sliver drop: every ring converges onto the throat (z = 0), and on a ventral / inferior mouth the pocket is a slot near the
+   centre plane, so DEEP ring triangles (rings 3-4, never front-view sheets) in the corner region fell inside the 0.02 x head-width band too; dropping SOME of them left free edges
+   inside the head (sturgeon, carpet shark). The drop is therefore confined to the FRONT of the aperture, i.e. ahead of the corner region L6 audits (stations >= CORNER_U x mcU,
+   coherence.js mouthSeal): a triangle is eligible only if every station it carries (aBody.x, stored float32 - compared as stored) lies ahead of it. In the corner region nothing is
+   ever removed, whatever the placement (the rule reads stations only), so the cheek wall and the rings stay welded right to the rear edge at the hinge. */
+export const CORNER_U = .7;
+const cornerFront = (u, bm) => Math.fround(u) < CORNER_U * bm.mcU;
+
 /** Interior pocket (round 2): ONE closed bag rooted on the lip edge.
     rim loop = upper lip copy (static) + lower lip copy (moves with the jaw, weight jawW) joined at both corners at the hinge;
     hood (upper wall) and floor (lower wall) run from the rim to a throat cap; each flank gets a cheek wall between the upper and lower lip edge
@@ -110,7 +120,9 @@ export function buildCavity(bm, mats, H) {
       push(q, r.u, r.w * Math.pow(1 - d, 1.4));
     }
   }
-  for (let i = 0; i < N; i++) for (let j = 0; j < Mr; j++) { const a = i * Mr + j, b = i * Mr + (j + 1) % Mr, c = a + Mr, d = b + Mr; if (!isSheet(pos, a, c, b, tz)) idx.push(a, c, b); if (!isSheet(pos, b, c, d, tz)) idx.push(b, c, d); }
+  /* round 6H.3b (L6): the centre-band sliver drop runs only in the FRONT of the aperture (see CORNER_SEAL) - in the corner region every ring triangle is kept */
+  const front = j => cornerFront(Math.max(rim[j].u, rim[(j + 1) % Mr].u), bm);
+  for (let i = 0; i < N; i++) for (let j = 0; j < Mr; j++) { const a = i * Mr + j, b = i * Mr + (j + 1) % Mr, c = a + Mr, d = b + Mr; if (!(front(j) && isSheet(pos, a, c, b, tz))) idx.push(a, c, b); if (!(front(j) && isSheet(pos, b, c, d, tz))) idx.push(b, c, d); }
   const grp = [{ name: 'hood/floor rings', a: 0, b: idx.length / 3 }];   /* round 4: triangle ranges per constructor (centre-plane audit names the offender by group) */
   const centre = push(throat, u1, 0); for (let j = 0; j < Mr; j++) idx.push(N * Mr + j, centre, N * Mr + (j + 1) % Mr);
   grp.push({ name: 'throat cap fan', a: grp[0].b, b: idx.length / 3 });
@@ -124,8 +136,9 @@ export function buildCavity(bm, mats, H) {
     }
     const t0 = idx.length / 3;
     /* round 4: the two flanks must not leave a standing sheet on the centre plane at the very front of the aperture: triangles wholly inside the 0.02 × head-width band are dropped (the hood / floor rings close that sliver) */
-    const keep = (a, b, c) => !isSheet(pos, a, b, c, tolZ, true);
-    for (let i = 0; i < K; i++) for (let j = 0; j < S; j++) { const a = base + i * (S + 1) + j, b = a + S + 1; if (keep(a, b, a + 1)) idx.push(a, b, a + 1); if (keep(a + 1, b, b + 1)) idx.push(a + 1, b, b + 1); }
+    /* round 6H.3b (L6): same front-only rule - a wall row is eligible only if it ends ahead of the corner region; from there to the rear edge at the hinge every wall triangle is kept */
+    const keep = (a, b, c, i) => !cornerFront(us[i + 1], bm) || !isSheet(pos, a, b, c, tolZ, true);
+    for (let i = 0; i < K; i++) for (let j = 0; j < S; j++) { const a = base + i * (S + 1) + j, b = a + S + 1; if (keep(a, b, a + 1, i)) idx.push(a, b, a + 1); if (keep(a + 1, b, b + 1, i)) idx.push(a + 1, b, b + 1); }
     wallRanges.push([base, pos.length / 3, side]);
     grp.push({ name: 'cheek wall ' + (side > 0 ? 'R' : 'L'), a: t0, b: idx.length / 3 });
   }
