@@ -86,7 +86,7 @@ void main(){ vec3 p = position; vec3 n = normal; float ph = phaseOf(); p += infl
   float rip = sin(rayT*9.0 + t*8.0 + u*4.0) * flex * mobile*mobile * uLen * .008*tissue;
   if(uMode == 7 && kind == 1.0) rip = sin(rayT*12.0 - t*14.0) * lenT*lenT * uLen * 0.03;
   if((kind == 2.0 || kind == 1.0) && uMode == 0 && flex > 0.9) rip = sin(rayT*14.0 - t*7.0) * lenT*lenT*uLen*0.03;
-  p.z += rip*mobile;
+  p.z += rip*mobile*(1.0-aSkin.w);                              /* round 6B.1: ripple suppressed where the fin hugs the wall */
   if(kind == 3.0){
     if(uPecDisc > .5){ p.y += sin(u*uDiscK - t*6.2831853) * mobile*mobile * uDiscAmp; }   /* merged disc: travelling wave along the margin, no separate joint */
     else if(aHinge.w != 0.0){                                   /* base joint: sweep + abduction, tip lags the base in phase, ray flex travels outward */
@@ -103,7 +103,7 @@ void main(){ vec3 p = position; vec3 n = normal; float ph = phaseOf(); p += infl
     } }
   applyWave(p, n, ph); mat4 mm = modelM(); vec4 wp = mm*vec4(p,1.0); vWP = wp.xyz; vN = normalize(mat3(mm)*n); vFin = aFin; vFin2 = aFin2; vSkin=aSkin; vCirc=vec2(cos(aSkin.y*6.2831853),sin(aSkin.y*6.2831853)); gl_Position = projectionMatrix*viewMatrix*wp; }`;
 const FS_FIN = GLSL_COMMON_FS + GLSL_PIGMENT + /* glsl */`
-uniform vec3 uFinCol; uniform float uIrid,uGloss; varying vec3 vN, vWP; varying vec4 vFin, vFin2, vSkin; varying vec2 vCirc;
+uniform vec3 uFinCol; uniform float uIrid,uGloss,uMatte,uSheen; varying vec3 vN, vWP; varying vec4 vFin, vFin2, vSkin; varying vec2 vCirc;
 void main(){ float rayT = vFin.x, lenT = vFin.y, op = vFin2.x, memb = vFin2.y, sf = vFin2.z, R = vFin2.w;
   if(vFin.w>2.5 && vFin.w<3.5) memb = 1.02;                                   /* round 2: a side fin keeps its membrane to the margin between the rays (no bare spikes) */
   float rl = abs(fract(rayT*(R-1.0)+0.5)-0.5); float isSpine = step(rayT, sf - 0.001); float rayW = mix(0.08, 0.16, isSpine)*(1.0-0.5*lenT); float ray = 1.0 - smoothstep(rayW, rayW+0.08, rl);
@@ -116,7 +116,7 @@ void main(){ float rayT = vFin.x, lenT = vFin.y, op = vFin2.x, memb = vFin2.y, s
   /* membrane: collagen fibre sheen between the rays, pigment blotches and a clearer distal margin */
   float fibre=.94+.06*sin(rayT*R*18.0+lenT*9.0);
   float blotch=fbm(vec2(rayT*9.0, lenT*5.0)+uSeed*1.3);
-  col*=fibre*(.88+.24*blotch);
+  col*=mix(fibre*(.88+.24*blotch),1.0,root);                                     /* round 6B.1: no membrane brightening in the root zone */
   col=mix(col, col*vec3(1.15,1.12,1.06), smoothstep(.75,1.0,lenT)*.5*(1.0-vSkin.z));
   if(vSkin.z>.5) col=mix(skin,uFinCol*.9,smoothstep(.28,1.0,lenT)*.18);
   else {
@@ -130,6 +130,12 @@ void main(){ float rayT = vFin.x, lenT = vFin.y, op = vFin2.x, memb = vFin2.y, s
   vec3 N=normalize(vN); if(!gl_FrontFacing) N=-N;
   vec3 c=wetLight(col,N,vWP,uGloss*.38,(1.0-vSkin.z)*(1.0-root)*.6);                 /* matte / satin membrane */
   c+=col*uLightCol*pow(max(0.0,dot(-N,normalize(uLightDir))),2.0)*(1.0-vSkin.z)*(1.0-root)*.15;
+  if(vSkin.z<.5){   /* round 6B.1 ROOT_CAP: the root zone is lit like the flank (same lighting law, flank normal, body roughness) and can never read brighter than it: no glow blob, no pale patch */
+    float rr=1.0-smoothstep(.02,.34,lenT); vec3 Vv=normalize(cameraPosition-vWP), Nr=normalize(vN); if(dot(Nr,Vv)<0.0) Nr=-Nr;
+    float roughB=mix(.56,.13,uGloss)*(1.0-.2*uSheen); roughB=mix(roughB,roughB*1.4+.1,uMatte);
+    vec3 cRef=pbrSkin(skin,Nr,vWP,roughB,0.0,.12,mix(.45,1.0,uWet)*(1.0-.55*uMatte+.12*uSheen),vec3(0.0));
+    c=mix(c,min(c,cRef),rr);
+  }
   float fog=fogAmt(vWP); c=mix(c,uFogCol,fog); gl_FragColor=vec4(c,a);
 }`;
 const VS_EYE = GLSL_SWIM + /* glsl */`
@@ -284,15 +290,6 @@ function initScene() {
   canvas.addEventListener('pointerdown', () => { App.cameraTween = null; controls.enableDamping = true; });
   addEventListener('resize', onResize); onResize();
 }
-function onResize() { if (!renderer) return; const width = innerWidth - (typeof currentTab !== 'undefined' && currentTab && innerWidth >= 1000 ? 420 : 0); renderer.setSize(width, innerHeight, false); $('gl').style.width = width + 'px'; camera.aspect = width / innerHeight; camera.updateProjectionMatrix(); }
-function applyTier() {
-  const t = TIERS[App.tier]; if (renderer) renderer.setPixelRatio(Math.min(devicePixelRatio || 1, t.pr));
-  if (App.env) { if (App.env.shafts) App.env.shafts.visible = t.shafts && App.mode === 'habitat'; if (App.env.particles) { App.env.particles.visible = t.particles > 0 && App.mode === 'habitat'; App.env.particles.geometry.setDrawRange(0, t.particles); } }
-  if (App.school) App.school.setCount(t.school);
-  const target = App.tier >= 2 ? 'med' : 'hero';
-  if (App.fish && App.fish.info.quality !== target && !App.qualityPending) { App.qualityPending = true; setTimeout(() => { App.qualityPending = false; if (App.genome && !App.contextLost) setFish(App.genome, { noHistory: true, keepCamera: true, skipPanel: true }); }, 0); }
-}
-function adaptQuality(dt, fps) { App.fpsEma = lerp(App.fpsEma, fps, 0.08); if (App.fpsEma < 42) { App.lowT += dt; App.highT = 0; if (App.lowT > 2 && App.tier < TIERS.length - 1) { App.tier++; App.lowT = 0; applyTier(); toast('Lowered detail (tier ' + App.tier + ') to keep 60 fps'); } } else if (App.fpsEma > 57) { App.highT += dt; App.lowT = 0; if (App.highT > 10 && App.tier > (isMobile ? 1 : 0)) { App.tier--; App.highT = 0; applyTier(); } } else { App.lowT = Math.max(0, App.lowT - dt); } }
 /* ── environment ── */
 const FS_FLOOR = GLSL_COMMON_FS + /* glsl */`
 uniform vec3 uColor; uniform float uCaustic, uScale; varying vec3 vWP; varying vec2 vUv;

@@ -14,6 +14,7 @@
   let caudal = null; if (f.caudal.present) caudal = addCaudal(fb, bm, q.K, q.detail ? clamp(f.caudal.rays, 7, 40) : 7);
   const finGeo = fb.build(); geos.push(finGeo); tris += finGeo.index.count / 3;
   const fins = opts.instanced ? new THREE.InstancedMesh(finGeo, mats.fin, opts.instanced) : new THREE.Mesh(finGeo, mats.fin); fins.frustumCulled = false; fins.renderOrder = 2; group.add(fins); parts.fins = fins;
+  if (fb.moundList.length) { const mg = FINROOT.buildMoundGeo(THREE, fb.moundList, q.detail ? 22 : 8, q.detail ? 10 : 4); geos.push(mg); const mm = new THREE.Mesh(mg, mats.body); mm.frustumCulled = false; mm.userData.finMound = true; group.add(mm); parts.mounds = mm; }   /* round 6B.1: fleshy fin bases, skinned with the body's own field */
   if (q.detail && !opts.instanced) {
     if (!bm.oralDisc && !bm.ventralMouth && bm.law.mouth.construction !== 'fused') {   /* fused construction: one solid beak-like terminal structure, no hinged jaw, no cavity */
       const jaw = buildJawGeometry(bm); geos.push(jaw.geo); tris += jaw.geo.index.count / 3; bm.pivotX = jaw.pivot.x; uni.uJawPivot.value.set(jaw.pivot.x, jaw.pivot.y); uni.uJawOpenMax.value = bm.law.mouth.construction === 'fused' ? 0 : jaw.openAngle; uni.uJawSpread.value = MOUTH.jawSpreadRef(bm, GH);

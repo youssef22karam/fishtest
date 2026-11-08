@@ -1,32 +1,31 @@
 function triArea(P, a, b, c2) { const ax = P[a * 3], ay = P[a * 3 + 1], az = P[a * 3 + 2]; const ux = P[b * 3] - ax, uy = P[b * 3 + 1] - ay, uz = P[b * 3 + 2] - az, vx = P[c2 * 3] - ax, vy = P[c2 * 3 + 1] - ay, vz = P[c2 * 3 + 2] - az; const cx = uy * vz - uz * vy, cy = uz * vx - ux * vz, cz = ux * vy - uy * vx; return 0.5 * Math.sqrt(cx * cx + cy * cy + cz * cz); }
 class FinBuilder {
-  constructor() { this.pos = []; this.fin = []; this.fin2 = []; this.skin = []; this.base = []; this.idx = []; this.rays = []; this.areas = {}; this.nv = 0; this.bases = []; this.attachments = []; this.rootNormals = []; this.hinge = []; this.axis = []; }
+  constructor() { this.pos = []; this.fin = []; this.fin2 = []; this.skin = []; this.base = []; this.idx = []; this.rays = []; this.areas = {}; this.nv = 0; this.bases = []; this.attachments = []; this.rootNormals = []; this.hinge = []; this.axis = []; this.mound = false; this.moundList = []; }
   add(sp) {
-    const R = sp.R, K = sp.K, v0 = this.nv, faceSize = R * (K + 1), b = new THREE.Vector3(), edge = new THREE.Vector3(), root = new THREE.Vector3(), q = new THREE.Vector3(), normal = sp.normal.clone(), tips = []; let area = 0;
+    const R = sp.R, K = sp.K, v0 = this.nv, faceSize = R * (K + 1), b = new THREE.Vector3(), edge = new THREE.Vector3(), root = new THREE.Vector3(), q = new THREE.Vector3(), normal = sp.normal.clone(), tips = [], M = this.mound && !sp.noMound && sp.kind !== 'caudal' ? FINROOT.planMound(sp, sp.moundK || 1) : null; let area = 0; if (M) this.moundList.push(M);   /* round 6B.1: fleshy base */
     const tri = (i, j, k, side) => {
       const P = this.pos, ax = P[j * 3] - P[i * 3], ay = P[j * 3 + 1] - P[i * 3 + 1], az = P[j * 3 + 2] - P[i * 3 + 2], bx = P[k * 3] - P[i * 3], by = P[k * 3 + 1] - P[i * 3 + 1], bz = P[k * 3 + 2] - P[i * 3 + 2];
       const dot = (ay * bz - az * by) * normal.x + (az * bx - ax * bz) * normal.y + (ax * by - ay * bx) * normal.z;
       this.idx.push(i, dot * side < 0 ? k : j, dot * side < 0 ? j : k);
     };
     for (const side of [1, -1]) for (let i = 0; i < R; i++) {
-      const t = i / (R - 1); sp.base(t, b); sp.edge(t, edge); sp.root(t, side, root);
+      const t = i / (R - 1); sp.base(t, b); sp.edge(t, edge); sp.root(t, side, root); if (M) { FINROOT.liftCentre(M, i, b); if (M.zs) edge.z += M.zs * M.zl; }
       const u = root.u, ang = ((root.theta + Math.PI / 2) / TAU + 1) % 1;
       if (side === 1) { tips.push(edge.clone()); if (i % 2 === 0) this.rays.push([b.x, b.y, b.z, edge.x, edge.y, edge.z]); }
       const attached = !sp.attached || sp.attached(t);
-      if (attached) sp.bm.attachedSurface(u, root.theta, root);
+      let lift = 0; if (attached) { sp.bm.attachedSurface(u, root.theta, root); if (M) lift = FINROOT.liftRoot(M, i, side, root); }
       const rnS = new THREE.Vector3(); if (sp.sink && attached) sp.bm.surfaceNormal(u, root.theta, rnS);
-      if (attached) { this.bases.push([root.x, root.y, root.z, sp.kind]); this.attachments.push({ kind: sp.kind, u, theta: root.theta, point: [root.x, root.y, root.z], index: this.nv, allow: (sp.sink || 0) + (sp.thickness || 0) * (1 + (sp.lead || 0) * 1.35) * (sp.baseThick || 0) });   /* allow = deliberate burial depth + fleshy base wedge */ }
+      if (attached) { this.bases.push([root.x, root.y, root.z, sp.kind]); this.attachments.push({ kind: sp.kind, u, theta: root.theta, point: [root.x, root.y, root.z], index: this.nv, allow: (M ? lift : sp.sink || 0) + (sp.thickness || 0) * (1 + (sp.lead || 0) * 1.35) * (sp.baseThick || 0) });   /* allow = deliberate burial depth + fleshy base wedge */ }
+      let rn0 = null;
       for (let k = 0; k <= K; k++) {
         const s = k / K, collar = 1 - sstep(0, .42 + .16 * sp.blend, s);
         q.copy(b).lerp(edge, s).addScaledVector(root.clone().sub(b), collar);
         const lead = sp.lead ? 1 + sp.lead * Math.exp(-t * 9) + sp.lead * Math.exp(-(1 - t) * 14) * .35 : 1;   /* thickened leading edge */
         const width = sp.thickness * lead * (Math.pow(Math.sin(Math.PI * s), 1.2) * (1 - s) + (sp.baseThick || 0) * (1 - sstep(0, .55, s))) * Math.pow(Math.max(0, Math.sin(Math.PI * t)), .45);
-        if (sp.sink && attached) q.addScaledVector(rnS, -sp.sink * (1 - sstep(0, .45, s)));   /* fleshy base buried in the body wall */
+        if (sp.sink && attached && !M) q.addScaledVector(rnS, -sp.sink * (1 - sstep(0, .45, s)));   /* fleshy base buried in the body wall */
         q.addScaledVector(normal, side * width);
-        if (k === 0 && attached) {
-          const rn = new THREE.Vector3(); sp.bm.surfaceNormal(u, root.theta, rn);
-          this.rootNormals.push([this.nv, rn.x, rn.y, rn.z]);
-        }
+        const wN = !attached ? 0 : M ? 1 - sstep(0, .4, s) : k === 0 ? 1 : 0;   /* shading eases from the flank normal to the fin plane */
+        if (wN > 0) { rn0 = rn0 || sp.bm.surfaceNormal(u, root.theta, new THREE.Vector3()); this.rootNormals.push([this.nv, rn0.x, rn0.y, rn0.z, wN]); }
         if (sp.hinge) { this.hinge.push(sp.hinge.x, sp.hinge.y, sp.hinge.z, sp.hinge.sg); this.axis.push(sp.hinge.ax, sp.hinge.ay, sp.hinge.az); } else { this.hinge.push(0, 0, 0, 0); this.axis.push(0, 0, 0); }
         this.pos.push(q.x, q.y, q.z); this.fin.push(t, s, sp.flex, sp.kindId); this.fin2.push(sp.opacity, sp.memb, sp.spineFrac, sp.physicalR || R);
         this.skin.push(u, ang, 0, 0); this.base.push(root.x, root.y, root.z); this.nv++;
@@ -39,9 +38,10 @@ class FinBuilder {
     }
     for (let i = 0; i < R - 1; i++) { const a = v0 + i * (K + 1) + K, b2 = a + K + 1, c2 = a + faceSize, d = b2 + faceSize; this.idx.push(a, c2, b2, b2, c2, d); }
     for (const i of [0, R - 1]) for (let k = 0; k < K; k++) { const a = v0 + i * (K + 1) + k, b2 = a + faceSize; this.idx.push(a, a + 1, b2, a + 1, b2 + 1, b2); }
+    if (M && !M.zs) FINROOT.rippleGuard(sp.bm, this.pos, this.fin, this.skin, v0, this.nv);
     this.areas[sp.kind] = (this.areas[sp.kind] || 0) + area; return { tips, area };
   }
-  build() { const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(this.pos, 3)); geo.setAttribute('aFin', new THREE.Float32BufferAttribute(this.fin, 4)); geo.setAttribute('aFin2', new THREE.Float32BufferAttribute(this.fin2, 4)); geo.setAttribute('aSkin', new THREE.Float32BufferAttribute(this.skin, 4)); geo.setAttribute('aBase', new THREE.Float32BufferAttribute(this.base, 3)); geo.setAttribute('aHinge', new THREE.Float32BufferAttribute(this.hinge, 4)); geo.setAttribute('aAxis', new THREE.Float32BufferAttribute(this.axis, 3)); geo.setIndex(this.idx); geo.computeVertexNormals(); const n = geo.getAttribute('normal'); for (const [i, x, y, z] of this.rootNormals) n.setXYZ(i, x, y, z); return geo; }
+  build() { const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(this.pos, 3)); geo.setAttribute('aFin', new THREE.Float32BufferAttribute(this.fin, 4)); geo.setAttribute('aFin2', new THREE.Float32BufferAttribute(this.fin2, 4)); geo.setAttribute('aSkin', new THREE.Float32BufferAttribute(this.skin, 4)); geo.setAttribute('aBase', new THREE.Float32BufferAttribute(this.base, 3)); geo.setAttribute('aHinge', new THREE.Float32BufferAttribute(this.hinge, 4)); geo.setAttribute('aAxis', new THREE.Float32BufferAttribute(this.axis, 3)); geo.setIndex(this.idx); geo.computeVertexNormals(); const n = geo.getAttribute('normal'); for (const [i, x, y, z, w = 1] of this.rootNormals) { const m = new THREE.Vector3(n.getX(i) * (1 - w) + x * w, n.getY(i) * (1 - w) + y * w, n.getZ(i) * (1 - w) + z * w).normalize(); n.setXYZ(i, m.x, m.y, m.z); } return geo; }
 }
 function foil_(o, fn, t) { return ['triangle', 'falcate'].includes(o.shape) ? 1 : fn(t, o.spineFrac); }
 function addRidgeFin(fb, bm, o) {
@@ -112,25 +112,16 @@ function addPectoral(fb, bm, side, K, rays) {
   }
   rep = { cls: plan.cls, hinged: !disc, sinkOverL: sink / L, lenOverL: disc ? 0 : extent() / L, restAbd: plan.restAbd, lagDeg: plan.lagDeg, hinge: hinge && [hinge.x, hinge.y, hinge.z] };
   const info = bm.pecInfo || (bm.pecInfo = {}); info[side] = rep; info.mirrored = !!(info[1] && info[-1] && Math.abs(info[1].lenOverL - info[-1].lenOverL) < 1e-6 && Math.abs(info[1].sinkOverL - info[-1].sinkOverL) < 1e-9);
-  return fb.add({ bm, kind: 'pectoral', kindId: 3, R: Math.max(rays, K > 2 ? 20 : 6), physicalR: rays, K, flex: f.flex, opacity: f.opacity, memb: f.shape === 'filament' ? .3 : bm.a.family === 'lion' ? .8 : 1, spineFrac: 0, solid: bm.a.solid,
+  const spec = ({ bm, kind: 'pectoral', kindId: 3, R: Math.max(rays, K > 2 ? 20 : 6), physicalR: rays, K, flex: f.flex, opacity: f.opacity, memb: f.shape === 'filament' ? .3 : bm.a.family === 'lion' ? .8 : 1, spineFrac: 0, solid: bm.a.solid,
     blend: f.rootBlend, thickness: bm.maxD * bm.a.root * (bm.a.solid ? .24 : .13), normal: disc ? new THREE.Vector3(0, 1, 0) : new THREE.Vector3(0, 0, 1), root,
     sink, lead: disc ? 0 : 1.6, baseThick: disc ? 0 : .9, hinge,
-    base: basePt, edge: (t, out) => tipFor(t, out, len) });
-}
-function addPelvic(fb, bm, side, K, rays) {
-  const f = bm.g.fins.pelvic, u = bm.lm.pelvicBase, p = {}, fr = {}, fused = f.shape === 'fused', len = f.len * bm.maxD * .55, spread = fused ? .16 : .48, sec = {};
-  bm.frame(u, fr); bm.section(u, sec);
-  /* round 3: pelvic fins stay small — never longer than the side fins of the same fish (gliding plan excepted), ≤ .20 L, base buried like the others */
-  const pecL = bm.pecInfo && bm.pecInfo[1] && bm.pecInfo[1].lenOverL ? bm.pecInfo[1].lenOverL * bm.L : 0, glide = bm.a.family === 'glider' || bm.a.family === 'ray', sink = Math.min(TAIL.CAP.sink * bm.L, .5 * sec.dDn);
-  const lenCap = Math.min(TAIL.CAP.pelvicH * bm.L / .8, glide || !pecL ? 9 : pecL * .8); const lenF = Math.min(len, lenCap); (bm.finH || (bm.finH = {})).pelvic = lenF * 1.2 / bm.L; bm.finH.pecL = pecL / bm.L;
-  const rootU = t => clamp(u + t * bm.bp.maxD * .12, .02, .94), rootTh = -Math.PI / 2 + side * spread;
-  return fb.add({ bm, kind: 'pelvic', kindId: 4, sink, R: Math.max(rays, K > 2 ? 10 : 4), K, flex: f.flex, opacity: f.opacity, memb: f.shape === 'filament' ? .32 : 1, spineFrac: 0, solid: bm.a.solid, blend: .65, thickness: bm.maxD * bm.a.root * .22, normal: new THREE.Vector3(0, 0, side),
-    base: (t, out) => { bm.surface(rootU(t), rootTh, p); out.set(p.x, p.y, p.z); },
-    root: (t, skinSide, out) => { const uu = rootU(t), theta = rootTh + skinSide * .045 * Math.sin(Math.PI * t); bm.surface(uu, theta, p); out.set(p.x, p.y, p.z); out.u = uu; out.theta = theta; },
-    edge: (t, out) => {
-      const v = foilOutline(t, .4, .55, .5), h = f.shape === 'filament' ? Math.pow(Math.max(0, Math.sin(Math.PI * t)), 5) : v[1];
-      bm.surface(rootU(t), rootTh, p); out.set(p.x + fr.tx * lenF * .8 * h, p.y - lenF * (bm.a.solid ? .3 : .68) * h, p.z + side * lenF * .6 * h);
-    } });
+    base: basePt, edge: (t, out) => tipFor(t, out, len), noMound: disc });
+  if (!disc && fb.mound) {   /* round 6B.1 clearance fit: the fin stands out laterally on its fleshy base by exactly the lift at which no fin vertex can enter the body anywhere in the full sweep x abduction range (+ worst ripple). Pure z shift of fin AND joint, so the motion is unchanged. Right fin fitted, left is the mirror. */
+    const trial = z => { const sp2 = Object.assign({}, spec, { zLift: z, zSide: side, noLift: z === 0, hinge: Object.assign({}, hinge, { z: hinge.z + z }) }), f2 = new FinBuilder(); f2.mound = true; f2.add(sp2); return FINROOT.pecNeed(bm, f2, 0, f2.nv, plan.restAbd); };
+    if (bm.pecZ === undefined) { let z = trial(0); if (z > 0) { z += FINROOT.ROOT.tol * L * 1.6; for (let it = 0; it < 4; it++) { const w = trial(z); if (w <= 0) break; z += w + FINROOT.ROOT.tol * L; } } bm.pecZ = z; }
+    Object.assign(spec, { zLift: bm.pecZ, zSide: side, hinge: Object.assign({}, hinge, { z: hinge.z + bm.pecZ }) });
+  }
+  return fb.add(spec);
 }
 function addCaudal(fb, bm, K, rays) { return TAIL.buildCaudal(THREE, fb, bm, K, rays); }   /* round 3: bounded tail anatomy lives in tailgeo.js */
 function mergeGeos(list) {
@@ -256,7 +247,7 @@ function buildFish(g, opts = {}) {
   uni.uDetail.value = q.detail ? 1 : 0;
   const group = new THREE.Group(); let tris = bodyGeo.index.count / 3; const parts = {};
   const body = opts.instanced ? new THREE.InstancedMesh(bodyGeo, mats.body, opts.instanced) : new THREE.Mesh(bodyGeo, mats.body); body.frustumCulled = false; group.add(body); parts.body = body;
-  const fb = new FinBuilder(); const rc = n => q.detail ? clamp(Math.round(n), 8, 40) : 5; const sf = d => d.spines / Math.max(1, d.spines + d.rays);
+  const fb = new FinBuilder(); fb.mound = q.detail && !opts.instanced; const rc = n => q.detail ? clamp(Math.round(n), 8, 40) : 5; const sf = d => d.spines / Math.max(1, d.spines + d.rays);
   if (f.dorsal.present && f.dorsal.count > 0) {
     if (bm.a.separatedDorsal) {
       const n = q.detail ? clamp(f.dorsal.spines, 6, 16) : 5;
